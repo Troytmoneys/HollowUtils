@@ -4,7 +4,7 @@
 
 Java 21 plugin targeting **Paper 1.21.11**, with **Multiverse-Core 5.x** and **Multiverse-Inventories 5.x**. Use recent releases exposing the current `MultiverseCoreApi` and `MultiverseInventoriesApi` APIs (including advancement, statistics and recipe shares). Older Multiverse 4.x is unsupported. Folia is unsupported.
 
-A “server” is a logical group of three worlds on one Paper process. `/server` opens a paginated inventory selector; `/server survival` joins directly. The initially loaded primary world and its loaded vanilla Nether/End become the reserved `lobby` group. A created server gets `hu_<name>`, `hu_<name>_nether`, and `hu_<name>_the_end`, using one seed.
+A “server” is a logical group of one or three worlds on one Paper process. `/server` opens a paginated inventory selector; `/server survival` joins directly. The initially loaded primary world and its loaded vanilla Nether/End become the reserved `lobby` group. A full server gets `hu_<name>`, `hu_<name>_nether`, and `hu_<name>_the_end`, using one seed. Normal and flat servers get only `hu_<name>`.
 
 ## Build and install
 
@@ -23,7 +23,7 @@ If an existing MVI group contains exactly the lobby worlds, its existing profile
 | Command | Behavior |
 | --- | --- |
 | `/server [name] [player]` | Open selector, join a logical server or move a target player |
-| `/createserver <name> [numeric-seed]` | Create all three dimensions and their MVI profile group |
+| `/createserver <name> [full\|normal\|flat] [numeric-seed]` | Create the selected world group and its MVI profile |
 | `/backupserver <name>` | Back up an empty non-lobby server's world directories |
 | `/whitelistserver <name> on\|off` | Enable/disable UUID access list |
 | `/whitelistserver <name> add\|remove <online-name-or-UUID>` | Change access list |
@@ -80,7 +80,7 @@ Player targets use exact online names, case-insensitively. Selectors and partial
 
 ## Backups and recovery
 
-Move every player out of the target server first. Backup saves and temporarily **unloads all three worlds** through Multiverse, writes a ZIP in `plugins/HollowUtils/backups/`, and reloads the previously loaded worlds in a `finally` block. It rejects symlinks, omits `session.lock`, cleans partial archives and never overwrites an existing ZIP. A companion `.servers.yml` records configuration. File copying is synchronous: large worlds can pause the main thread and trigger watchdog limits. Prefer stopped-process backups for large deployments. The primary lobby cannot be unloaded and must be backed up offline.
+Move every player out of the target server first. Backup saves and temporarily **unloads every world in the selected group** through Multiverse, writes a ZIP in `plugins/HollowUtils/backups/`, and reloads the previously loaded worlds in a `finally` block. It rejects symlinks, omits `session.lock`, cleans partial archives and never overwrites an existing ZIP. A companion `.servers.yml` records configuration. File copying is synchronous: large worlds can pause the main thread and trigger watchdog limits. Prefer stopped-process backups for large deployments. The primary lobby cannot be unloaded and must be backed up offline.
 
 **These are world backups, not complete player-profile backups.** MVI's active profile caches and plugin-owned data are not captured by `/backupserver`. For disaster recovery, stop Paper and copy the entire server directory, including `plugins/Multiverse-Inventories`, `plugins/Multiverse-Core`, `plugins/HollowUtils`, all worlds and all other plugin data. Keep copies outside this host. Restore only while stopped, with the matching registry and MVI profiles. Do not restore only one player's vanilla `playerdata` and expect it to override MVI.
 
@@ -110,7 +110,7 @@ Essentials coexistence checklist: with Essentials installed, confirm `/gmc`, `/g
 | Command | Behavior |
 | --- | --- |
 | `/back` | Return to your last death location in the current logical server; saved across restarts |
-| `/backup [server] [local\|drive\|both]` | Evacuate the target group to lobby, create a local three-world ZIP and optionally upload it to Drive (default: both) |
+| `/backup [server] [local\|drive\|both]` | Evacuate the target group to lobby, create a local ZIP of the selected group's worlds and optionally upload it to Drive (default: both) |
 | `/bottom [player]` | Go down to the lowest full solid block with two air blocks above it at the same X/Z coordinates; refuses if none exists |
 | `/bc <message>`, `/broadcast <message>` | Broadcast plain text to **all logical servers on this Paper process**, regardless of their chat separation |
 | `/ci [player]`, `/clearinventory [player]`, `/clear [player]` | Clear inventory, armor, offhand and cursor; preserve ender chest |
@@ -145,7 +145,7 @@ New features compile against Paper 1.21.11; the existing 20 automated tests pass
 
 ## Modern moderation
 
-Punishments are scoped to the issuing player's **current logical server**, including all three dimensions. Operators do not bypass bans. Console explicitly selects scope: `ban --server survival Alex Griefing`. All commands take ownership of their unqualified labels just like the Essentials-style commands above.
+Punishments are scoped to the issuing player's **current logical server**, including all of its dimensions. Operators do not bypass bans. Console explicitly selects scope: `ban --server survival Alex Griefing`. All commands take ownership of their unqualified labels just like the Essentials-style commands above.
 
 | Command | Usage |
 | --- | --- |
@@ -212,3 +212,19 @@ HollowUtils mutes and temporary mutes also block sending through **every** priva
 Social spy shows all successfully delivered HollowUtils private messages in the opted-in staff member's current logical server, except conversations they already participate in. It never forwards messages from another logical server and does not hook third-party plugin messages. Spy permission is checked for every delivery; subscriptions clear on logout, reconnect, restart or changing logical server (dimension travel within the same group keeps the setting). It does not persist message content or forward PMs to console. Give this permission only to trusted staff and inform players that authorized staff can moderate private messages.
 
 The build passes **37 tests**, including owner/server-scoped home persistence, alias delivery, private-message mute enforcement, hidden/cross-server target filtering, spy scope, permission revocation and logout cleanup. Live home GUI and chat-plugin coexistence testing remains required on staging.
+
+
+## Server creation modes
+
+Use `/createserver <name> [full|normal|flat] [seed]`:
+
+- `/createserver survival full` — normal overworld, Nether and End.
+- `/createserver solo normal` — normal overworld only.
+- `/createserver creative flat` — superflat overworld only, using Multiverse's `WorldType.FLAT` generator option.
+- `/createserver solo normal 12345` — select a mode and an optional numeric 64-bit seed.
+
+`full` is the default. Both `/createserver survival` and the legacy `/createserver survival 12345` still create all three dimensions. Mode names complete automatically in the second argument. Server names retain the existing lowercase validation rules. Invalid modes/seeds are rejected before world creation.
+
+The selected world's list is saved in `servers.yml`; normal/flat servers do not register or generate Nether/End worlds. Their portals are blocked with an explanatory message when that destination dimension is absent. Backup and deletion act on exactly the group's registered worlds. Flat generation settings persist in Multiverse/world data; existing servers are not converted or regenerated by changing this command syntax.
+
+Build validation: **41 passing tests**, including mode selection, dimensions, terrain flags, default/legacy syntax, explicit/random seeds and invalid inputs. Live Multiverse generation of each mode still requires staging verification. Restart Paper after replacing the JAR.

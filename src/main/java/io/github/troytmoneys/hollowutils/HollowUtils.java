@@ -190,8 +190,8 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
                     saveData(); say(sender, "Spawn set for " + server.id + ".");
                 }
             } else if (name.equals("createserver")) {
-                if (args.length < 1 || args.length > 2) return false;
-                create(sender, args[0], args.length == 2 ? Long.parseLong(args[1]) : new Random().nextLong());
+                if (args.length < 1 || args.length > 3) return false;
+                create(sender, ServerCreation.parse(args, () -> new Random().nextLong()));
             } else {
                 if (args.length == 0) return false;
                 ServerGroup server = requireServer(args[0]);
@@ -231,21 +231,21 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
         if (text.equalsIgnoreCase("off")) return false;
         throw new IllegalArgumentException("Use on or off.");
     }
-    private void create(CommandSender sender, String id, long seed) throws IOException {
-        List<String> names = ServerGroup.worldNames(id);
+    private void create(CommandSender sender, ServerCreation plan) throws IOException {
+        String id = plan.name();
+        List<String> names = plan.worldNames();
         if (id.equals("lobby") || servers.containsKey(id)) throw new IllegalArgumentException("That server already exists or is reserved.");
         for (String world : names) if (Bukkit.getWorld(world) != null || Files.exists(Bukkit.getWorldContainer().toPath().resolve(world)))
             throw new IllegalArgumentException("World already exists: " + world);
-        say(sender, "Creating three dimensions; world generation may briefly pause the server.");
+        say(sender, "Creating " + plan.mode().name().toLowerCase(Locale.ROOT) + " server (" + names.size() + " world(s)); generation may briefly pause the server.");
         // Persist a locked recovery record BEFORE creating any worlds. Never delete pre-existing paths on failure.
         ServerGroup server = new ServerGroup(id, names);
         server.deleting = true;
         servers.put(id, server);
         saveData();
         try {
-            multiverse.create(names.get(0), World.Environment.NORMAL, seed);
-            multiverse.create(names.get(1), World.Environment.NETHER, seed);
-            multiverse.create(names.get(2), World.Environment.THE_END, seed);
+            for (ServerCreation.Dimension dimension : plan.dimensions())
+                multiverse.create(dimension.name(), dimension.environment(), plan.seed(), dimension.terrain());
             multiverse.configure(server);
             server.deleting = false;
             saveData();
@@ -293,7 +293,7 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
         String key = sender.getName() + ":" + server.id;
         if (!confirm || confirmations.getOrDefault(key, 0L) < System.currentTimeMillis()) {
             confirmations.put(key, System.currentTimeMillis() + 30_000);
-            say(sender, "Permanently delete all three worlds? Run /deleteserver " + server.id + " confirm within 30 seconds. A world backup will be made first."); return;
+            say(sender, "Permanently delete this server's " + server.worlds.size() + " world(s)? Run /deleteserver " + server.id + " confirm within 30 seconds. A world backup will be made first."); return;
         }
         if (!occupants(server).isEmpty()) throw new IllegalArgumentException("Move all players out before deleting.");
         Path archive = backup(server);
@@ -436,6 +436,9 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
         else if (Moderation.COMMANDS.contains(name)) choices.addAll(moderation.complete(sender,name,args));
         else if (ExtraCommands.NAMES.contains(name)) choices.addAll(extras.complete(sender, name, args));
         else if (UtilityCommands.COMMANDS.contains(name)) choices.addAll(utilities.complete(sender, name, args));
+        else if (name.equals("createserver")) {
+            if (args.length == 2) choices.addAll(ServerCreation.options());
+        }
         else if (args.length == 1 && Set.of("spawn", "setspawn").contains(name)) choices.addAll(utilities.targetNames(sender, "hollowutils." + name + ".others"));
         else if (args.length == 2 && name.equals("server")) choices.addAll(utilities.targetNames(sender, "hollowutils.server.others"));
         else if (args.length == 1) {
@@ -527,7 +530,7 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
         World.Environment targetEnvironment = end ? (environment == World.Environment.THE_END ? World.Environment.NORMAL : World.Environment.THE_END)
                 : (environment == World.Environment.NETHER ? World.Environment.NORMAL : World.Environment.NETHER);
         World target = server.worlds.stream().map(Bukkit::getWorld).filter(Objects::nonNull).filter(w -> w.getEnvironment() == targetEnvironment).findFirst().orElse(null);
-        if (target == null) { event.setCancelled(true); return; }
+        if (target == null) { event.setCancelled(true); say(event.getPlayer(), "This server does not have that dimension."); return; }
         if (end) event.setTo(targetEnvironment == World.Environment.NORMAL ? spawn(server) : target.getSpawnLocation());
         else {
             Location location = event.getFrom().clone();

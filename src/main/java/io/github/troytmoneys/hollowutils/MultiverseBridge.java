@@ -32,10 +32,11 @@ final class MultiverseBridge {
         invoke(groups, "recalculateApplicableShares");
     }
     private Object worldManager() { return invoke(worlds, "getWorldManager"); }
-    void create(String name, World.Environment environment, long seed) {
+    void create(String name, World.Environment environment, long seed, WorldType terrain) {
         Object options = invoke(type(coreLoader, "org.mvplugins.multiverse.core.world.options.CreateWorldOptions"), "worldName", name);
         invoke(options, "environment", environment);
         invoke(options, "seed", seed);
+        invoke(options, "worldType", terrain);
         checkAttempt(invoke(worldManager(), "createWorld", options));
         if (Bukkit.getWorld(name) == null) throw new IllegalStateException("Multiverse did not load " + name);
     }

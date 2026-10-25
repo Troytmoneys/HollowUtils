@@ -11,11 +11,11 @@ commands:
     usage: /server [name] [player]
     permission: hollowutils.use
   createserver:
-    description: Create an isolated three-world server
-    usage: /createserver <name> [seed]
+    description: Create an isolated full, normal or superflat server
+    usage: /createserver <name> [full|normal|flat] [seed]
     permission: hollowutils.admin
   backupserver:
-    description: Back up the three world directories
+    description: Back up the selected server world directories
     usage: /backupserver <name>
     permission: hollowutils.admin
   whitelistserver:
@@ -23,7 +23,7 @@ commands:
     usage: /whitelistserver <name> <on|off|add|remove|list> [online-player-or-UUID]
     permission: hollowutils.admin
   deleteserver:
-    description: Back up then delete an empty server
+    description: Back up then delete an empty server and all its dimensions
     usage: /deleteserver <name> [confirm]
     permission: hollowutils.admin
   maintenanceserver:
