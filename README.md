@@ -191,3 +191,24 @@ Startup compatibility fix: Multiverse's world-group manager is a non-public impl
 `/warp` without a name also opens the selector. Warp commands require an in-game player to determine the logical server. Names use the same lowercase rules as server/kit names. Existing names cannot be overwritten; delete first to replace. Each logical server has its own names, suggestions and GUI entries, so two servers may both have `shop` without sharing destinations. Warps may link the overworld, Nether and End inside that group. Destinations outside the group, in unloaded worlds or outside current world bounds/borders are rejected; existing teleport, maintenance, whitelist and ban checks still apply. Create warps on safe ground: the saved position is used exactly.
 
 Warp records persist by world UUID in `plugins/HollowUtils/warps.yml`; include it in full-server backups. A malformed file is not silently overwritten. The GUI blocks item movement, rechecks permission and server membership at click time, and handles deleted or unavailable destinations. After deleting/recreating a logical server, review its retained warp definitions before reusing the name. The build passes 32 tests, including restart persistence, shared warp names across scopes, coordinate/facing preservation and failed-save recovery. Live GUI/teleport integration remains to be checked on staging.
+
+## Private homes and messaging
+
+| Command | Behavior | Permission (default) |
+| --- | --- | --- |
+| `/createhome <name>` | Save your current position/facing as your own home | `hollowutils.createhome` (everyone) |
+| `/deletehome <name>` | Delete one of your homes in this logical server | `hollowutils.deletehome` (everyone) |
+| `/home <name>` | Travel to your named home | `hollowutils.home` (everyone) |
+| `/homegui` | Browse your homes in a paginated selector | `hollowutils.homegui` (everyone), plus `hollowutils.home` to travel |
+| `/msg <player> <message>` | Send a private message to a visible online player in your logical server | `hollowutils.msg` (everyone) |
+| `/socialspy [on\|off]` | Toggle staff monitoring of private messages in the current logical server | `hollowutils.socialspy` (op) |
+
+`/home` without a name also opens the home GUI. Homes are stored by **player UUID and logical server** in `plugins/HollowUtils/homes.yml`. Other players, including operators, cannot list, use or delete someone else's homes through these commands. A player may reuse the same home name on different servers. Names use the existing lowercase naming rules, and existing homes must be deleted before replacement. There is currently no numeric home limit. Coordinates, facing and world UUID survive restarts; the same world availability, group, border, ban, whitelist and maintenance checks used for warps apply. Include `homes.yml` in full-server backups. GUI actions recheck owner scope and permissions, block item movement, and cannot cross into another player's home list. Like warps, home commands require an in-game player.
+
+Messaging aliases: `/pm`, `/message`, `/whisper` and `/privatemanager` all use exactly the `/msg <player> <message>` syntax and `hollowutils.msg` permission. They receive the same command priority as the other HollowUtils commands. Messages use exact online player names (case-insensitively), 1–500 plain-text characters, and cannot be sent to yourself. Targets and suggestions are restricted to visible players in the sender's current logical server, including its Nether/End. Hidden, missing and cross-server recipients receive the same lookup error. This feature does not provide a separate `/privatemanager` settings menu.
+
+HollowUtils mutes and temporary mutes also block sending through **every** private-message alias. Receiving messages remains allowed. This does not control third-party messaging plugins that you explicitly allowlist.
+
+Social spy shows all successfully delivered HollowUtils private messages in the opted-in staff member's current logical server, except conversations they already participate in. It never forwards messages from another logical server and does not hook third-party plugin messages. Spy permission is checked for every delivery; subscriptions clear on logout, reconnect, restart or changing logical server (dimension travel within the same group keeps the setting). It does not persist message content or forward PMs to console. Give this permission only to trusted staff and inform players that authorized staff can moderate private messages.
+
+The build passes **37 tests**, including owner/server-scoped home persistence, alias delivery, private-message mute enforcement, hidden/cross-server target filtering, spy scope, permission revocation and logout cleanup. Live home GUI and chat-plugin coexistence testing remains required on staging.

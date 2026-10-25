@@ -41,6 +41,18 @@ class WarpStoreTest {
         assertThrows(IOException.class,()->new WarpStore(file));
         assertEquals(before,Files.readString(file));
     }
+    @Test void homesWithTheSameNameStayPrivateToOwnerAndServerAcrossRestarts() throws Exception {
+        Path file=temp.resolve("homes.yml"); var store=new WarpStore(file);
+        UUID alice=UUID.randomUUID(),bob=UUID.randomUUID();
+        String first=WarpStore.homeScope("alpha",alice),second=WarpStore.homeScope("alpha",bob),third=WarpStore.homeScope("beta",alice);
+        var a=destination(); var b=destination(); var c=destination();
+        store.create(first,"bed",a); store.create(second,"bed",b); store.create(third,"bed",c);
+        var restored=new WarpStore(file);
+        assertEquals(a,restored.get(first,"bed")); assertEquals(b,restored.get(second,"bed")); assertEquals(c,restored.get(third,"bed"));
+        restored.delete(first,"bed");
+        assertEquals(List.of(),restored.names(first)); assertEquals(List.of("bed"),restored.names(second));
+        assertEquals(c,new WarpStore(file).get(third,"bed"));
+    }
     @Test void rejectsNonfiniteCoordinatesAndSortsSuggestions() throws Exception {
         assertThrows(IllegalArgumentException.class,()->new WarpStore.Destination(UUID.randomUUID(),Double.NaN,1,1,0,0));
         var store=new WarpStore(temp.resolve("warps.yml")); store.create("alpha","zoo",destination()); store.create("alpha","arena",destination());

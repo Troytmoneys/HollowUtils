@@ -72,6 +72,10 @@ final class Moderation implements Listener {
             return HexFormat.of().formatHex(bytes);
         } catch (Exception e) { throw new IllegalStateException(e); }
     }
+    boolean muted(Player player) {
+        String scope=plugin.serverId(player);
+        return records.stream().anyMatch(p -> p.applies(scope,"MUTE",player.getUniqueId().toString(),System.currentTimeMillis()));
+    }
     boolean banned(Player player, String scope) {
         String uuid = player.getUniqueId().toString();
         String address = player.getAddress() == null ? "" : ip(player.getAddress().getAddress());

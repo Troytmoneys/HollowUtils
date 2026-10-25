@@ -186,6 +186,46 @@ commands:
     description: Server-local warps - warpgui
     usage: /warpgui
     permission: hollowutils.warpgui
+  createhome:
+    description: HollowUtils createhome
+    usage: /createhome <name>
+    permission: hollowutils.createhome
+  deletehome:
+    description: HollowUtils deletehome
+    usage: /deletehome <name>
+    permission: hollowutils.deletehome
+  home:
+    description: HollowUtils home
+    usage: /home [name]
+    permission: hollowutils.home
+  homegui:
+    description: HollowUtils homegui
+    usage: /homegui
+    permission: hollowutils.homegui
+  msg:
+    description: HollowUtils msg
+    usage: /msg <player> <message>
+    permission: hollowutils.msg
+  pm:
+    description: HollowUtils msg
+    usage: /pm <player> <message>
+    permission: hollowutils.msg
+  message:
+    description: HollowUtils msg
+    usage: /message <player> <message>
+    permission: hollowutils.msg
+  whisper:
+    description: HollowUtils msg
+    usage: /whisper <player> <message>
+    permission: hollowutils.msg
+  privatemanager:
+    description: HollowUtils msg
+    usage: /privatemanager <player> <message>
+    permission: hollowutils.msg
+  socialspy:
+    description: HollowUtils socialspy
+    usage: /socialspy [on|off]
+    permission: hollowutils.socialspy
 permissions:
   hollowutils.use:
     default: true
@@ -276,3 +316,15 @@ permissions:
     default: op
   hollowutils.warpgui:
     default: true
+  hollowutils.createhome:
+    default: true
+  hollowutils.deletehome:
+    default: true
+  hollowutils.home:
+    default: true
+  hollowutils.homegui:
+    default: true
+  hollowutils.msg:
+    default: true
+  hollowutils.socialspy:
+    default: op
