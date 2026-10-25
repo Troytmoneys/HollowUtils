@@ -105,6 +105,21 @@ final class MultiverseBridge {
         try { return Class.forName(name, true, loader); }
         catch (ClassNotFoundException e) { throw new IllegalStateException("Requires compatible Multiverse 5.x: " + name, e); }
     }
+    // Multiverse intentionally keeps YamlWorldGroupManager and its abstract superclass
+    // package-private. Invoke the method declared by its public API interface instead.
+    private static Method accessibleMethod(Class<?> type, String name, Class<?>[] parameters) {
+        if (Modifier.isPublic(type.getModifiers())) {
+            try {
+                Method method = type.getMethod(name, parameters);
+                if (Modifier.isPublic(method.getDeclaringClass().getModifiers())) return method;
+            } catch (NoSuchMethodException ignored) { }
+        }
+        for (Class<?> api : type.getInterfaces()) {
+            Method method = accessibleMethod(api, name, parameters);
+            if (method != null) return method;
+        }
+        return type.getSuperclass() == null ? null : accessibleMethod(type.getSuperclass(), name, parameters);
+    }
     static Object invoke(Object target, String name, Object... args) {
         Class<?> type = target instanceof Class<?> c ? c : target.getClass();
         for (Method method : type.getMethods()) {
@@ -119,7 +134,10 @@ final class MultiverseBridge {
                 if (args[i] != null && !p.isInstance(args[i])) { match = false; break; }
             }
             if (!match) continue;
-            try { return method.invoke(target instanceof Class<?> ? null : target, args); }
+            Method accessible = accessibleMethod(type, name, parameters);
+            if (accessible == null) throw new IllegalStateException("No public Multiverse API declaration for " + type.getName() + "." + name);
+            try { return accessible.invoke(target instanceof Class<?> ? null : target, args); }
+            catch (InvocationTargetException e) { throw new IllegalStateException("Multiverse API failed: " + name + ": " + e.getCause().getMessage(), e.getCause()); }
             catch (ReflectiveOperationException e) { throw new IllegalStateException("Multiverse API failed: " + name, e); }
         }
         throw new IllegalStateException("Incompatible Multiverse API: " + type.getName() + "." + name);
