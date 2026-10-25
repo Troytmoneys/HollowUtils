@@ -1,0 +1,9 @@
+# Additional commands must themselves enforce server-local player/data access.
+# All commands other than HollowUtils commands are blocked by default, even for ops.
+allowed-commands: []
+
+# gdrive v3 must be installed and authenticated by the server operator.
+# No credential values belong here. /backup always keeps the local ZIP.
+gdrive:
+  executable: gdrive
+  parent-id: ''

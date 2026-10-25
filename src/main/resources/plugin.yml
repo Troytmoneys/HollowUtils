@@ -1,0 +1,254 @@
+name: HollowUtils
+version: 1.0.0
+main: io.github.troytmoneys.hollowutils.HollowUtils
+api-version: '1.21.11'
+depend: [Multiverse-Core, Multiverse-Inventories]
+softdepend: [Essentials, CMI]
+description: Isolated logical survival servers with linked dimensions.
+commands:
+  server:
+    description: Open the server menu or join a server
+    usage: /server [name] [player]
+    permission: hollowutils.use
+  createserver:
+    description: Create an isolated three-world server
+    usage: /createserver <name> [seed]
+    permission: hollowutils.admin
+  backupserver:
+    description: Back up the three world directories
+    usage: /backupserver <name>
+    permission: hollowutils.admin
+  whitelistserver:
+    description: Manage a server whitelist
+    usage: /whitelistserver <name> <on|off|add|remove|list> [online-player-or-UUID]
+    permission: hollowutils.admin
+  deleteserver:
+    description: Back up then delete an empty server
+    usage: /deleteserver <name> [confirm]
+    permission: hollowutils.admin
+  maintenanceserver:
+    description: Toggle maintenance for a server
+    usage: /maintenanceserver <name> <on|off>
+    permission: hollowutils.admin
+  spawn:
+    description: Teleport to this server's spawn
+    usage: /spawn [player]
+    permission: hollowutils.use
+  setspawn:
+    description: Set this server's spawn at your position or a target player's position
+    usage: /setspawn [player]
+    permission: hollowutils.admin
+  gmc:
+    description: Change gamemode for yourself or another player
+    usage: /gmc [player]
+    permission: hollowutils.gamemode
+  gms:
+    description: Change gamemode for yourself or another player
+    usage: /gms [player]
+    permission: hollowutils.gamemode
+  gmsp:
+    description: Change gamemode for yourself or another player
+    usage: /gmsp [player]
+    permission: hollowutils.gamemode
+  gma:
+    description: Change gamemode for yourself or another player
+    usage: /gma [player]
+    permission: hollowutils.gamemode
+  gamemode:
+    description: Change gamemode for yourself or another player
+    usage: /gamemode <survival|creative|adventure|spectator> [player]
+    permission: hollowutils.gamemode
+  gm:
+    description: Change gamemode for yourself or another player
+    usage: /gm <survival|creative|adventure|spectator> [player]
+    permission: hollowutils.gamemode
+  heal:
+    description: Restore health and hunger and extinguish fire
+    usage: /heal [player]
+    permission: hollowutils.heal
+  back:
+    description: HollowUtils back
+    usage: /back
+    permission: hollowutils.back
+  backup:
+    description: HollowUtils backup
+    usage: /backup [server] [local|drive|both]
+    permission: hollowutils.backup
+  bottom:
+    description: HollowUtils bottom
+    usage: /bottom [player]
+    permission: hollowutils.bottom
+  bc:
+    description: HollowUtils broadcast
+    usage: /bc <message>
+    permission: hollowutils.broadcast
+  broadcast:
+    description: HollowUtils broadcast
+    usage: /broadcast <message>
+    permission: hollowutils.broadcast
+  ci:
+    description: HollowUtils clear
+    usage: /ci [player]
+    permission: hollowutils.clear
+  clearinventory:
+    description: HollowUtils clear
+    usage: /clearinventory [player]
+    permission: hollowutils.clear
+  clear:
+    description: HollowUtils clear
+    usage: /clear [player]
+    permission: hollowutils.clear
+  createkit:
+    description: HollowUtils createkit
+    usage: /createkit <name> <INVENTORY|GUI>
+    permission: hollowutils.createkit
+  kit:
+    description: HollowUtils kit
+    usage: /kit [name] [player]
+    permission: hollowutils.kit
+  deletekit:
+    description: HollowUtils deletekit
+    usage: /deletekit <name>
+    permission: hollowutils.deletekit
+  ban:
+    description: Server-scoped moderation - ban
+    usage: /ban <player|uuid> [reason]
+    permission: hollowutils.ban
+  banip:
+    description: Server-scoped moderation - banip
+    usage: /banip <player|ip> [reason]
+    permission: hollowutils.banip
+  unban:
+    description: Server-scoped moderation - unban
+    usage: /unban <player|uuid>
+    permission: hollowutils.unban
+  unbanip:
+    description: Server-scoped moderation - unbanip
+    usage: /unbanip <player|ip>
+    permission: hollowutils.unbanip
+  staffrollback:
+    description: Server-scoped moderation - staffrollback
+    usage: /staffrollback <staff|uuid|CONSOLE> [confirm]
+    permission: hollowutils.staffrollback
+  kick:
+    description: Server-scoped moderation - kick
+    usage: /kick <player> [reason]
+    permission: hollowutils.kick
+  mute:
+    description: Server-scoped moderation - mute
+    usage: /mute <player|uuid> [reason]
+    permission: hollowutils.mute
+  unmute:
+    description: Server-scoped moderation - unmute
+    usage: /unmute <player|uuid>
+    permission: hollowutils.unmute
+  tempban:
+    description: Server-scoped moderation - tempban
+    usage: /tempban <player|uuid> <duration> [reason]
+    permission: hollowutils.tempban
+  tempmute:
+    description: Server-scoped moderation - tempmute
+    usage: /tempmute <player|uuid> <duration> [reason]
+    permission: hollowutils.tempmute
+  warn:
+    description: Server-scoped moderation - warn
+    usage: /warn <player|uuid> [reason]
+    permission: hollowutils.warn
+  unwarn:
+    description: Server-scoped moderation - unwarn
+    usage: /unwarn <player|uuid> <id|all>
+    permission: hollowutils.unwarn
+  warns:
+    description: Server-scoped moderation - warns
+    usage: /warns <player|uuid> [page]
+    permission: hollowutils.warns
+  punishments:
+    description: Server-scoped moderation - punishments
+    usage: /punishments <player|uuid> [page]
+    permission: hollowutils.punishments
+  history:
+    description: Server-scoped moderation - history
+    usage: /history <player|uuid|ip> [page]
+    permission: hollowutils.history
+permissions:
+  hollowutils.use:
+    default: true
+  hollowutils.admin:
+    default: op
+  hollowutils.bypass:
+    description: Enter whitelisted or maintenance servers
+    default: op
+  hollowutils.gamemode:
+    default: op
+  hollowutils.gamemode.creative:
+    default: op
+  hollowutils.gamemode.survival:
+    default: op
+  hollowutils.gamemode.adventure:
+    default: op
+  hollowutils.gamemode.spectator:
+    default: op
+  hollowutils.gamemode.others:
+    default: op
+  hollowutils.heal:
+    default: op
+  hollowutils.heal.others:
+    default: op
+  hollowutils.spawn.others:
+    default: op
+  hollowutils.setspawn.others:
+    default: op
+  hollowutils.server.others:
+    default: op
+  hollowutils.back:
+    default: true
+  hollowutils.backup:
+    default: op
+  hollowutils.bottom:
+    default: op
+  hollowutils.broadcast:
+    default: op
+  hollowutils.clear:
+    default: op
+  hollowutils.createkit:
+    default: op
+  hollowutils.kit:
+    default: op
+  hollowutils.deletekit:
+    default: op
+  hollowutils.bottom.others:
+    default: op
+  hollowutils.clear.others:
+    default: op
+  hollowutils.kit.others:
+    default: op
+  hollowutils.ban:
+    default: op
+  hollowutils.banip:
+    default: op
+  hollowutils.unban:
+    default: op
+  hollowutils.unbanip:
+    default: op
+  hollowutils.staffrollback:
+    default: op
+  hollowutils.kick:
+    default: op
+  hollowutils.mute:
+    default: op
+  hollowutils.unmute:
+    default: op
+  hollowutils.tempban:
+    default: op
+  hollowutils.tempmute:
+    default: op
+  hollowutils.warn:
+    default: op
+  hollowutils.unwarn:
+    default: op
+  hollowutils.warns:
+    default: op
+  hollowutils.punishments:
+    default: op
+  hollowutils.history:
+    default: op

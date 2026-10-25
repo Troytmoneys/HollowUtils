@@ -1,0 +1,37 @@
+package io.github.troytmoneys.hollowutils;
+
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+
+class PunishmentTest {
+    private Punishment entry(String type,long expires) {
+        return new Punishment("id","alpha",type,"player","Name","staff","Staff","Reason",100,expires,0,"");
+    }
+    @Test void timedPunishmentsExpireAtTheirBoundaryAndPermanentBansDoNot() {
+        assertTrue(entry("BAN",200).active(199));
+        assertFalse(entry("BAN",200).active(200));
+        assertTrue(entry("BAN",0).active(Long.MAX_VALUE));
+        assertFalse(entry("KICK",0).active(101));
+    }
+    @Test void scopeIdentityAndTypeMustAllMatch() {
+        var ban=entry("BAN",0);
+        assertTrue(ban.applies("alpha","BAN","player",150));
+        assertFalse(ban.applies("beta","BAN","player",150));
+        assertFalse(ban.applies("alpha","MUTE","player",150));
+        assertFalse(ban.applies("alpha","BAN","someone-else",150));
+    }
+    @Test void revocationPreservesEvidenceAndNeverReactivatesOnExpiry() {
+        var original=entry("MUTE",200); var revoked=original.revoke(150,"reviewer");
+        assertFalse(revoked.active(151)); assertFalse(revoked.active(300));
+        assertTrue(original.active(151));
+        assertEquals(original.reason(),revoked.reason()); assertEquals(original.actor(),revoked.actor());
+        assertEquals("reviewer",revoked.revokedBy()); assertEquals(150,revoked.revoked());
+    }
+    @Test void durationsHaveExplicitUnitsAndRejectOverflowZeroAndUnboundedInput() {
+        assertEquals(30*60_000,Punishment.duration("30m"));
+        assertEquals(7*86_400_000L,Punishment.duration("1W"));
+        assertEquals(12*3_600_000L,Punishment.duration("12h"));
+        for (String bad:new String[]{"0m","-1d","30","1month","99999999999999999999999w","3651d","1h30m"})
+            assertThrows(IllegalArgumentException.class,()->Punishment.duration(bad));
+    }
+}
