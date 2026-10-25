@@ -100,7 +100,7 @@ commands:
     permission: hollowutils.clear
   createkit:
     description: HollowUtils createkit
-    usage: /createkit <name> <INVENTORY|GUI>
+    usage: /createkit <name> [INVENTORY|GUI]
     permission: hollowutils.createkit
   kit:
     description: HollowUtils kit
@@ -170,6 +170,22 @@ commands:
     description: Server-scoped moderation - history
     usage: /history <player|uuid|ip> [page]
     permission: hollowutils.history
+  createwarp:
+    description: Server-local warps - createwarp
+    usage: /createwarp <name>
+    permission: hollowutils.createwarp
+  warp:
+    description: Server-local warps - warp
+    usage: /warp [name]
+    permission: hollowutils.warp
+  deletewarp:
+    description: Server-local warps - deletewarp
+    usage: /deletewarp <name>
+    permission: hollowutils.deletewarp
+  warpgui:
+    description: Server-local warps - warpgui
+    usage: /warpgui
+    permission: hollowutils.warpgui
 permissions:
   hollowutils.use:
     default: true
@@ -252,3 +268,11 @@ permissions:
     default: op
   hollowutils.history:
     default: op
+  hollowutils.createwarp:
+    default: op
+  hollowutils.warp:
+    default: true
+  hollowutils.deletewarp:
+    default: op
+  hollowutils.warpgui:
+    default: true

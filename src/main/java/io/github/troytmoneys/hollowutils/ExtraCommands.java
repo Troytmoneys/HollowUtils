@@ -94,10 +94,10 @@ final class ExtraCommands implements Listener {
                 if (!mode.equals("local")) upload(sender, archive);
             }
             case "createkit" -> {
-                if (args.length != 2) return false;
+                if (args.length < 1 || args.length > 2) return false;
                 Player p = player(sender); String id = kitId(args[0]);
                 if (kits.contains(id)) throw new IllegalArgumentException("Kit exists; delete it first to replace it.");
-                if (args[1].equalsIgnoreCase("INVENTORY")) {
+                if (args.length == 1 || args[1].equalsIgnoreCase("INVENTORY")) {
                     saveKit(id, p.getInventory().getContents()); say(p, "Kit saved from inventory, armor and offhand.");
                 } else if (args[1].equalsIgnoreCase("GUI")) openEditor(p, new Editor(id));
                 else throw new IllegalArgumentException("Choose INVENTORY or GUI.");

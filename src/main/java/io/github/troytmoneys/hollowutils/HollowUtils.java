@@ -44,6 +44,7 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
     private NamespacedKey menuKey;
     private UtilityCommands utilities;
     private ExtraCommands extras;
+    private Warps warps;
     private Moderation moderation;
     private CommandPriority commandPriority;
 
@@ -91,6 +92,7 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
                 if (!group.deleting) multiverse.configure(group);
             }
             saveData();
+            warps = new Warps(this);
             extras = new ExtraCommands(this, utilities);
             moderation = new Moderation(this);
             ready = true;
@@ -102,7 +104,7 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
             for (Player player : Bukkit.getOnlinePlayers()) player.kick(Component.text("HollowUtils isolation setup failed. Contact an administrator."));
         }
     }
-    private static Set<String> allCommands() { Set<String> names = new HashSet<>(USER_COMMANDS); names.addAll(ADMIN_COMMANDS); names.addAll(UtilityCommands.COMMANDS); names.addAll(ExtraCommands.NAMES); names.addAll(Moderation.COMMANDS); return names; }
+    private static Set<String> allCommands() { Set<String> names = new HashSet<>(USER_COMMANDS); names.addAll(ADMIN_COMMANDS); names.addAll(UtilityCommands.COMMANDS); names.addAll(ExtraCommands.NAMES); names.addAll(Moderation.COMMANDS); names.addAll(Warps.COMMANDS); return names; }
     boolean hasServer(String id) { return servers.containsKey(id); }
     void removePunished(Player player, Component notice) {
         ServerGroup lobby = servers.get("lobby");
@@ -161,6 +163,7 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
         if (!ready) { say(sender, "Isolation is locked. Check the server console."); return true; }
         if (ADMIN_COMMANDS.contains(name) && !sender.hasPermission("hollowutils.admin")) { say(sender, "You do not have permission."); return true; }
         try {
+            if (Warps.COMMANDS.contains(name)) return warps.execute(sender,name,args);
             if (Moderation.COMMANDS.contains(name)) return moderation.execute(sender,name,args);
             if (ExtraCommands.NAMES.contains(name)) return extras.execute(sender, name, args);
             if (UtilityCommands.COMMANDS.contains(name)) return utilities.execute(sender, name, args);
@@ -365,6 +368,7 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
         if (normalized.startsWith("hollowutils:")) normalized = normalized.substring("hollowutils:".length());
         return (USER_COMMANDS.contains(normalized) && player.hasPermission("hollowutils.use"))
                 || (ADMIN_COMMANDS.contains(normalized) && player.hasPermission("hollowutils.admin"))
+                || (Warps.COMMANDS.contains(normalized) && player.hasPermission("hollowutils." + normalized))
                 || (Moderation.COMMANDS.contains(normalized) && player.hasPermission("hollowutils." + normalized))
                 || (ExtraCommands.NAMES.contains(normalized) && player.hasPermission(ExtraCommands.permission(normalized)))
                 || (UtilityCommands.COMMANDS.contains(normalized) && player.hasPermission(UtilityCommands.permission(normalized)))
@@ -417,7 +421,8 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
         if (!ready || args.length == 0) return List.of();
         List<String> choices = new ArrayList<>();
         String name = command.getName();
-        if (Moderation.COMMANDS.contains(name)) choices.addAll(moderation.complete(sender,name,args));
+        if (Warps.COMMANDS.contains(name)) choices.addAll(warps.complete(sender,name,args));
+        else if (Moderation.COMMANDS.contains(name)) choices.addAll(moderation.complete(sender,name,args));
         else if (ExtraCommands.NAMES.contains(name)) choices.addAll(extras.complete(sender, name, args));
         else if (UtilityCommands.COMMANDS.contains(name)) choices.addAll(utilities.complete(sender, name, args));
         else if (args.length == 1 && Set.of("spawn", "setspawn").contains(name)) choices.addAll(utilities.targetNames(sender, "hollowutils." + name + ".others"));
@@ -431,7 +436,7 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
         }
         // No Bukkit default completion fallback: that would expose global player names.
         String prefix = args[args.length - 1].toLowerCase(Locale.ROOT);
-        return choices.stream().filter(s -> s.startsWith(prefix)).sorted().toList();
+        return choices.stream().filter(s -> s.toLowerCase(Locale.ROOT).startsWith(prefix)).sorted().toList();
     }
     private void refreshVisibility() {
         for (Player viewer : Bukkit.getOnlinePlayers()) {

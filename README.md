@@ -114,7 +114,7 @@ Essentials coexistence checklist: with Essentials installed, confirm `/gmc`, `/g
 | `/bottom [player]` | Go down to the lowest full solid block with two air blocks above it at the same X/Z coordinates; refuses if none exists |
 | `/bc <message>`, `/broadcast <message>` | Broadcast plain text to **all logical servers on this Paper process**, regardless of their chat separation |
 | `/ci [player]`, `/clearinventory [player]`, `/clear [player]` | Clear inventory, armor, offhand and cursor; preserve ender chest |
-| `/createkit <name> INVENTORY` | Copy your inventory, armor and offhand into a persistent kit without consuming items |
+| `/createkit <name> [INVENTORY]` | Copy your inventory, armor and offhand into a persistent kit without consuming items |
 | `/createkit <name> GUI` | Open a blank template editor |
 | `/kit [name] [player]` | List kits or apply a kit to an empty player inventory |
 | `/deletekit <name>` | Delete a stored kit |
@@ -175,3 +175,19 @@ Keep the ledger private and include it in stopped-process full-server backups. W
 
 
 Startup compatibility fix: Multiverse's world-group manager is a non-public implementation of a public API. HollowUtils now invokes the public interface declaration, avoiding Java reflection access failures during setup and world-group operations. Regression tests cover hidden implementations, inherited methods, and preservation of the underlying error cause. The updated build passes 27 tests. If setup still fails, provide the console stack trace following `Isolation setup failed`, including all `Caused by` lines and your Multiverse versions; do not delete player profiles or the registry to work around the lock.
+
+
+## Warps and default kit capture
+
+`/createkit <name>` now defaults to `INVENTORY`: it copies your inventory, armor and offhand without consuming items. `/createkit <name> GUI` still opens the template editor, and explicit `INVENTORY` still works.
+
+| Command | Behavior | Permission (default) |
+| --- | --- | --- |
+| `/createwarp <name>` | Save your current position and facing | `hollowutils.createwarp` (op) |
+| `/warp <name>` | Teleport to a named warp in your current logical server | `hollowutils.warp` (everyone) |
+| `/deletewarp <name>` | Remove a warp from your current logical server | `hollowutils.deletewarp` (op) |
+| `/warpgui` | Open the paginated warp selector | `hollowutils.warpgui` (everyone), plus `hollowutils.warp` to travel |
+
+`/warp` without a name also opens the selector. Warp commands require an in-game player to determine the logical server. Names use the same lowercase rules as server/kit names. Existing names cannot be overwritten; delete first to replace. Each logical server has its own names, suggestions and GUI entries, so two servers may both have `shop` without sharing destinations. Warps may link the overworld, Nether and End inside that group. Destinations outside the group, in unloaded worlds or outside current world bounds/borders are rejected; existing teleport, maintenance, whitelist and ban checks still apply. Create warps on safe ground: the saved position is used exactly.
+
+Warp records persist by world UUID in `plugins/HollowUtils/warps.yml`; include it in full-server backups. A malformed file is not silently overwritten. The GUI blocks item movement, rechecks permission and server membership at click time, and handles deleted or unavailable destinations. After deleting/recreating a logical server, review its retained warp definitions before reusing the name. The build passes 32 tests, including restart persistence, shared warp names across scopes, coordinate/facing preservation and failed-save recovery. Live GUI/teleport integration remains to be checked on staging.
