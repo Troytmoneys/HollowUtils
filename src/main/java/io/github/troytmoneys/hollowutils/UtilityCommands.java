@@ -82,9 +82,10 @@ final class UtilityCommands {
             target.setFoodLevel(20);
             target.setSaturation(20);
             target.setExhaustion(0);
+            target.setRemainingAir(target.getMaximumAir());
             target.setFireTicks(0);
             target.setFallDistance(0);
-            tell(sender, "Healed " + target.getName() + ": hearts and hunger restored, fire extinguished.");
+            tell(sender, "Healed " + target.getName() + ": hearts, hunger and air restored; fire extinguished.");
             if (sender != target) tell(target, "You have been healed.");
         } else {
             target.setGameMode(mode);

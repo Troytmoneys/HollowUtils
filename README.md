@@ -38,7 +38,7 @@ If an existing MVI group contains exactly the lobby worlds, its existing profile
 | `/gmsp [player]` | Spectator mode |
 | `/gma [player]` | Adventure mode |
 | `/gamemode <mode> [player]`, `/gm <mode> [player]` | Change mode using a full name, `s/c/a/sp`, or `0/1/2/3` |
-| `/heal [player]` | Restore maximum hearts, full hunger/saturation, clear exhaustion, extinguish fire and reset fall distance |
+| `/heal [player]` | Restore maximum hearts, full hunger/saturation and air bubbles, clear exhaustion, extinguish fire and reset fall distance |
 
 Names: 1–24 lowercase letters, digits, underscores or hyphens, starting with a letter. Name collisions with existing world directories are rejected. The fallback lobby cannot be deleted, whitelisted or placed in maintenance.
 
@@ -60,7 +60,7 @@ The new utility permissions default to operators:
 | `hollowutils.heal` | Heal yourself |
 | `hollowutils.heal.others` | Heal another player; base heal permission also required |
 | `hollowutils.spawn.others` | Use `/spawn <player>` |
-| `hollowutils.setspawn.others` | Use `/setspawn <player>`; `hollowutils.admin` also required |
+| `hollowutils.setspawn.others` | Use `/setspawn <player>`; `hollowutils.setspawn` also required (also granted by legacy `hollowutils.admin`) |
 | `hollowutils.server.others` | Use `/server <name> <player>` |
 
 Player targets use exact online names, case-insensitively. Selectors and partial names are not supported. Players can only target visible players in their own logical server, including players in its Nether/End; operator status does not bypass this restriction. Player-name suggestions use those same rules and only offer other players when the caller has the command's `others` permission. Explicitly naming yourself does not require an `others` permission. Console must supply a player for player actions and can administer any server.
@@ -288,3 +288,35 @@ Spawn/death records automatically migrate to UUID-based coordinate maps that des
 Duration **and reason are required** for `/ban` and `/mute`. `infinite` is case-insensitive and means no expiry; timed values accept `s/m/h/d/w`. The duration argument offers completions including `infinite`. For console, keep the scope prefix: `ban --server survival Alex 7d Griefing`. IP bans, warnings and kick syntax remain unchanged. Existing permanent/temporary records, expiry timestamps and history are preserved; `/unban`, `/unmute` and staff rollback work as before. Staff previously granted only `hollowutils.tempban`/`hollowutils.tempmute` need the replacement ban/mute permissions.
 
 Validation: **62 passing tests** covering group-wide transitions, preflight occupancy, partial failures and retries, save failures, access locks, protected lobby, legacy location migration and timed/infinite punishment expiry. Live Multiverse load/unload, restart persistence and migrated spawn/death return still require staging verification. Restart Paper after installing this update; hot reload remains unsupported.
+
+
+## God mode, air refill, instant breaking and items
+
+| Command | Behavior |
+| --- | --- |
+| `/god [on\|off] [player]` | Toggle damage/fire/hunger protection in the current logical server; `/god <player>` toggles a target |
+| `/heal [player]` | Also refill air bubbles to the player's actual maximum air, including custom maximum-air values |
+| `/togglebreakdelay [on\|off]` | Toggle instant breaking of damageable blocks for yourself |
+| `/i <item> [amount]` | Give yourself an item, default amount 1 |
+| `/give <player> <item> [amount]` | Give an online player items, default amount 1 |
+| `/enchant <enchantment> [level]` | Enchant the main-hand item; default level 1; level 0 removes that enchantment |
+
+All new commands default to operators and use `hollowutils.<command>`. Giving to another player also requires `hollowutils.give.others`; granting god mode to someone else requires `hollowutils.god.others`. Exact names, visible-player lookup and logical-server scope are enforced for targets. Console must use `/give <player> ...` or `/god on|off <player>`; the held-item and instant-break commands require an in-game player.
+
+God mode cancels ordinary damage, combustion and hunger events. It does not set a permanent global invulnerability flag. God mode and instant breaking are session toggles: they turn off on logout, restart or changing logical server, while travel between dimensions in the same group keeps them enabled. Staff may grant god mode to a non-op without granting that player the command itself. God mode does not undo existing damage or provide a safe location if a player falls into the void; use `/heal` and teleports as needed. Other plugins that directly set health or override event cancellation can still affect players.
+
+Instant breaking uses Paper's normal block-damage flow and sets its instant-break flag. Cancelled damage events and negative-hardness blocks such as bedrock are not overridden. The subsequent normal block-break/protection events and normal tool/drop behavior remain in control. It does not remove the client's pause between blocks or grant permission to bypass protected regions. Permission and current-server scope are rechecked for each damage event.
+
+Item commands accept vanilla/namespaced material IDs, such as `diamond` and `minecraft:diamond_sword`; they do not parse arbitrary NBT. Grants split into native stack sizes and merge only identical items. Amounts accept 1–32768 but the **whole grant must fit** in available storage inventory space. Over-capacity requests fail before changing inventory; no leftovers are silently discarded or dropped on the ground. Existing armor, offhand and item metadata are preserved. Typical inventories cannot hold 32768 ordinary items at once.
+
+### Enchantment-level limitation
+
+The requested **32768 enchantment level is not implemented**: Paper/Minecraft 1.21.11's native enchantment component supports levels only up to **255**. Writing through an unsafe ItemMeta method still passes through Minecraft's capped component, so it cannot reliably produce a working level-32768 enchantment. This command accepts 0–255, rejects higher levels explicitly, and leaves the held item unchanged instead of silently clamping or displaying a fake level. Working custom level-32768 effects would require separately implemented behavior for individual enchantments and are outside this native enchantment command.
+
+Use registry IDs such as `/enchant sharpness 5`. Enchanted books use stored enchantments. Above-normal levels, incompatible items and conflicting enchantments additionally require `hollowutils.enchant.unsafe`. Even that permission does not lift the native 255 limit. Changes apply to a cloned item and verify the stored level before replacing the held stack. Existing metadata and other enchantments are retained.
+
+### Permission audit
+
+See [PERMISSIONS.md](PERMISSIONS.md) for **every command and permission node**. Every registered command now has a matching declaration and runtime permission gate. Core commands such as `/createserver` and `/setspawn` have individual permissions; legacy `hollowutils.admin` and `hollowutils.use` remain parent grants. Aliases intentionally share canonical permissions. The allowlist cannot bypass permissions on HollowUtils-owned commands.
+
+Validation: **77 passing tests**, including complete descriptor/runtime permission matching, legacy grants, god-mode toggling/targeting/scope, air refill to a custom maximum, instant-break cancellation and permission checks, atomic inventory allocation/overflow rejection, and explicit rejection of unsupported enchantment levels. Live block protection, damage cancellation, item/enchantment round trips and coexistence with other plugins remain to be checked on staging. Restart Paper after updating the JAR.

@@ -9,35 +9,35 @@ commands:
   server:
     description: Open the server menu or join a server
     usage: /server [name] [player]
-    permission: hollowutils.use
+    permission: hollowutils.server
   createserver:
     description: Create an isolated full, normal or superflat server
     usage: /createserver <name> [full|normal|flat] [seed]
-    permission: hollowutils.admin
+    permission: hollowutils.createserver
   backupserver:
     description: Back up the selected server world directories
     usage: /backupserver <name>
-    permission: hollowutils.admin
+    permission: hollowutils.backupserver
   whitelistserver:
     description: Manage a server whitelist
     usage: /whitelistserver <name> <on|off|add|remove|list> [online-player-or-UUID]
-    permission: hollowutils.admin
+    permission: hollowutils.whitelistserver
   deleteserver:
     description: Back up then delete an empty server and all its dimensions
     usage: /deleteserver <name> [confirm]
-    permission: hollowutils.admin
+    permission: hollowutils.deleteserver
   maintenanceserver:
     description: Toggle maintenance for a server
     usage: /maintenanceserver <name> <on|off>
-    permission: hollowutils.admin
+    permission: hollowutils.maintenanceserver
   spawn:
     description: Teleport to this server's spawn
     usage: /spawn [player]
-    permission: hollowutils.use
+    permission: hollowutils.spawn
   setspawn:
     description: Set this server's spawn at your position or a target player's position
     usage: /setspawn [player]
-    permission: hollowutils.admin
+    permission: hollowutils.setspawn
   gmc:
     description: Change gamemode for yourself or another player
     usage: /gmc [player]
@@ -266,11 +266,41 @@ commands:
     description: unloadserver all worlds of a logical server without deleting data
     usage: /unloadserver <name>
     permission: hollowutils.unloadserver
+  togglebreakdelay:
+    description: HollowUtils togglebreakdelay
+    usage: /togglebreakdelay [on|off]
+    permission: hollowutils.togglebreakdelay
+  i:
+    description: HollowUtils i
+    usage: /i <item> [amount]
+    permission: hollowutils.i
+  give:
+    description: HollowUtils give
+    usage: /give <player> <item> [amount]
+    permission: hollowutils.give
+  enchant:
+    description: HollowUtils enchant
+    usage: /enchant <enchantment> [level]
+    permission: hollowutils.enchant
+  god:
+    description: Toggle server-scoped damage protection
+    usage: /god [on|off] [player]
+    permission: hollowutils.god
 permissions:
   hollowutils.use:
     default: true
+    children:
+      hollowutils.server: true
+      hollowutils.spawn: true
   hollowutils.admin:
     default: op
+    children:
+      hollowutils.createserver: true
+      hollowutils.backupserver: true
+      hollowutils.whitelistserver: true
+      hollowutils.deleteserver: true
+      hollowutils.maintenanceserver: true
+      hollowutils.setspawn: true
   hollowutils.bypass:
     description: Enter whitelisted or maintenance servers
     default: op
@@ -393,4 +423,36 @@ permissions:
   hollowutils.loadserver:
     default: op
   hollowutils.unloadserver:
+    default: op
+  hollowutils.togglebreakdelay:
+    default: op
+  hollowutils.i:
+    default: op
+  hollowutils.give:
+    default: op
+  hollowutils.give.others:
+    default: op
+  hollowutils.enchant:
+    default: op
+  hollowutils.enchant.unsafe:
+    default: op
+  hollowutils.server:
+    default: true
+  hollowutils.spawn:
+    default: true
+  hollowutils.createserver:
+    default: op
+  hollowutils.backupserver:
+    default: op
+  hollowutils.whitelistserver:
+    default: op
+  hollowutils.deleteserver:
+    default: op
+  hollowutils.maintenanceserver:
+    default: op
+  hollowutils.setspawn:
+    default: op
+  hollowutils.god:
+    default: op
+  hollowutils.god.others:
     default: op

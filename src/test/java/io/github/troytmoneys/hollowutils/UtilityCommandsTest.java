@@ -27,9 +27,10 @@ class UtilityCommandsTest {
                     case "hasPermission" -> permissions.contains(args[0]);
                     case "canSee" -> true;
                     case "isDead" -> dead;
+                    case "getMaximumAir" -> 600;
                     case "getGameMode" -> values.get("GameMode");
                     case "setGameMode" -> { if (!cancelMode) values.put("GameMode", args[0]); yield null; }
-                    case "setHealth", "setFoodLevel", "setSaturation", "setExhaustion", "setFireTicks", "setFallDistance" -> {
+                    case "setHealth", "setFoodLevel", "setSaturation", "setExhaustion", "setFireTicks", "setFallDistance", "setRemainingAir" -> {
                         values.put(method.getName().substring(3), args[0]); yield null;
                     }
                     case "sendMessage" -> null;
@@ -64,6 +65,7 @@ class UtilityCommandsTest {
         assertEquals(20f, self.values.get("Saturation"));
         assertEquals(0f, self.values.get("Exhaustion"));
         assertEquals(0, self.values.get("FireTicks"));
+        assertEquals(600, self.values.get("RemainingAir"));
         assertEquals(0f, self.values.get("FallDistance"));
     }
     @Test void healDoesNotResurrectDeadPlayers() {

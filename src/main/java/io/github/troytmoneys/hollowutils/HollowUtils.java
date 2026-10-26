@@ -44,6 +44,8 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
     private volatile boolean ready;
     private NamespacedKey menuKey;
     private UtilityCommands utilities;
+    private ItemCommands items;
+    private GodMode god;
     private EnvironmentCommands environment;
     private ExtraCommands extras;
     private Warps warps;
@@ -108,6 +110,8 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
                 public void saveRegistry() throws IOException { saveData(); }
             });
             saveData();
+            items = new ItemCommands(this,utilities);
+            god = new GodMode(this,utilities);
             environment = new EnvironmentCommands(this,utilities);
             warps = new Warps(this);
             homes = new Warps(this,true);
@@ -125,7 +129,7 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
             for (Player player : Bukkit.getOnlinePlayers()) player.kick(Component.text("HollowUtils isolation setup failed. Contact an administrator."));
         }
     }
-    private static Set<String> allCommands() { Set<String> names = new HashSet<>(USER_COMMANDS); names.addAll(ADMIN_COMMANDS); names.addAll(UtilityCommands.COMMANDS); names.addAll(ExtraCommands.NAMES); names.addAll(Moderation.COMMANDS); names.addAll(Warps.COMMANDS); names.addAll(Warps.HOME_COMMANDS); names.addAll(SocialMessages.COMMANDS); names.addAll(EnvironmentCommands.COMMANDS); names.addAll(ServerLifecycle.COMMANDS); return names; }
+    private static Set<String> allCommands() { Set<String> names = new HashSet<>(USER_COMMANDS); names.addAll(ADMIN_COMMANDS); names.addAll(UtilityCommands.COMMANDS); names.addAll(ExtraCommands.NAMES); names.addAll(Moderation.COMMANDS); names.addAll(Warps.COMMANDS); names.addAll(Warps.HOME_COMMANDS); names.addAll(SocialMessages.COMMANDS); names.addAll(EnvironmentCommands.COMMANDS); names.addAll(ServerLifecycle.COMMANDS); names.addAll(ItemCommands.COMMANDS); names.addAll(GodMode.COMMANDS); return names; }
     boolean isMuted(Player player) { return moderation != null && moderation.muted(player); }
     List<World> serverWorlds(String id) {
         ServerGroup server=requireServer(id);
@@ -197,8 +201,10 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
     private boolean executeCommand(CommandSender sender, Command command, String label, String[] args) {
         String name = command.getName();
         if (!ready) { Responses.error(sender, "Isolation is locked. Check the server console."); return true; }
-        if (ADMIN_COMMANDS.contains(name) && !sender.hasPermission("hollowutils.admin")) { Responses.error(sender, "You do not have permission."); return true; }
+        if (!sender.hasPermission(CommandPermissions.node(name))) { Responses.error(sender, "You do not have permission."); return true; }
         try {
+            if (GodMode.COMMANDS.contains(name)) return god.execute(sender,args);
+            if (ItemCommands.COMMANDS.contains(name)) return items.execute(sender,name,args);
             if (ServerLifecycle.COMMANDS.contains(name)) {
                 UtilityCommands.requirePermission(sender,"hollowutils."+name);
                 if (args.length!=1) return false;
@@ -414,17 +420,8 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
     private boolean commandAllowed(Player player, String label) {
         String normalized = label.toLowerCase(Locale.ROOT);
         if (normalized.startsWith("hollowutils:")) normalized = normalized.substring("hollowutils:".length());
-        return (USER_COMMANDS.contains(normalized) && player.hasPermission("hollowutils.use"))
-                || (ADMIN_COMMANDS.contains(normalized) && player.hasPermission("hollowutils.admin"))
-                || (ServerLifecycle.COMMANDS.contains(normalized) && player.hasPermission("hollowutils."+normalized))
-                || (EnvironmentCommands.COMMANDS.contains(normalized) && player.hasPermission("hollowutils."+normalized))
-                || (SocialMessages.COMMANDS.contains(normalized) && player.hasPermission(SocialMessages.permission(normalized)))
-                || (Warps.HOME_COMMANDS.contains(normalized) && player.hasPermission("hollowutils."+normalized))
-                || (Warps.COMMANDS.contains(normalized) && player.hasPermission("hollowutils." + normalized))
-                || (Moderation.COMMANDS.contains(normalized) && player.hasPermission("hollowutils." + normalized))
-                || (ExtraCommands.NAMES.contains(normalized) && player.hasPermission(ExtraCommands.permission(normalized)))
-                || (UtilityCommands.COMMANDS.contains(normalized) && player.hasPermission(UtilityCommands.permission(normalized)))
-                || getConfig().getStringList("allowed-commands").contains(normalized);
+        if(allCommands().contains(normalized))return player.hasPermission(CommandPermissions.node(normalized));
+        return getConfig().getStringList("allowed-commands").contains(normalized);
     }
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true) public void command(PlayerCommandPreprocessEvent event) {
         String label = event.getMessage().substring(1).split(" ", 2)[0];
@@ -473,7 +470,9 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
         if (!ready || args.length == 0) return List.of();
         List<String> choices = new ArrayList<>();
         String name = command.getName();
-        if (ServerLifecycle.COMMANDS.contains(name)) {
+        if (GodMode.COMMANDS.contains(name)) choices.addAll(god.complete(sender,args));
+        else if (ItemCommands.COMMANDS.contains(name)) choices.addAll(items.complete(sender,name,args));
+        else if (ServerLifecycle.COMMANDS.contains(name)) {
             if(args.length==1 && sender.hasPermission("hollowutils."+name)) servers.values().stream().filter(s->!s.id.equals("lobby")).map(s->s.id).forEach(choices::add);
         }
         else if (EnvironmentCommands.COMMANDS.contains(name)) choices.addAll(environment.complete(sender,name,args));
