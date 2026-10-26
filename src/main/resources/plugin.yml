@@ -226,6 +226,46 @@ commands:
     description: HollowUtils socialspy
     usage: /socialspy [on|off]
     permission: hollowutils.socialspy
+  fly:
+    description: Server-local fly control
+    usage: /fly [on|off] [player]
+    permission: hollowutils.fly
+  flyspeed:
+    description: Server-local flyspeed control
+    usage: /flyspeed <0-10|reset> [player]
+    permission: hollowutils.flyspeed
+  walkspeed:
+    description: Server-local walkspeed control
+    usage: /walkspeed <0-10|reset> [player]
+    permission: hollowutils.walkspeed
+  day:
+    description: Server-local day control
+    usage: /day [server-for-console]
+    permission: hollowutils.day
+  night:
+    description: Server-local night control
+    usage: /night [server-for-console]
+    permission: hollowutils.night
+  sunset:
+    description: Server-local sunset control
+    usage: /sunset [server-for-console]
+    permission: hollowutils.sunset
+  sunrise:
+    description: Server-local sunrise control
+    usage: /sunrise [server-for-console]
+    permission: hollowutils.sunrise
+  sun:
+    description: Server-local sun control
+    usage: /sun [server-for-console]
+    permission: hollowutils.sun
+  rain:
+    description: Server-local rain control
+    usage: /rain [server-for-console]
+    permission: hollowutils.rain
+  thunder:
+    description: Server-local thunder control
+    usage: /thunder [server-for-console]
+    permission: hollowutils.thunder
 permissions:
   hollowutils.use:
     default: true
@@ -327,4 +367,30 @@ permissions:
   hollowutils.msg:
     default: true
   hollowutils.socialspy:
+    default: op
+  hollowutils.fly:
+    default: op
+  hollowutils.flyspeed:
+    default: op
+  hollowutils.walkspeed:
+    default: op
+  hollowutils.day:
+    default: op
+  hollowutils.night:
+    default: op
+  hollowutils.sunset:
+    default: op
+  hollowutils.sunrise:
+    default: op
+  hollowutils.sun:
+    default: op
+  hollowutils.rain:
+    default: op
+  hollowutils.thunder:
+    default: op
+  hollowutils.fly.others:
+    default: op
+  hollowutils.flyspeed.others:
+    default: op
+  hollowutils.walkspeed.others:
     default: op

@@ -64,7 +64,7 @@ final class Moderation implements Listener {
     }
     private String actor(CommandSender sender) { return sender instanceof Player p ? p.getUniqueId().toString() : "CONSOLE"; }
     private void message(CommandSender sender, String title, String body) {
-        sender.sendMessage(Component.text("▎ " + title + "  ",NamedTextColor.AQUA).append(Component.text(body,NamedTextColor.GRAY)));
+        Responses.info(sender,title,body);
     }
     private String ip(InetAddress address) {
         try {

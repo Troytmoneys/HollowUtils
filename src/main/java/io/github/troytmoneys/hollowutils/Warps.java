@@ -28,7 +28,7 @@ final class Warps implements Listener {
     private String scope(Player player) { return homes ? WarpStore.homeScope(plugin.serverId(player),player.getUniqueId()) : plugin.serverId(player); }
     private String permission(String command) { return "hollowutils."+(homes ? command.replace("warp","home") : command); }
     private void say(CommandSender sender,String message) {
-        sender.sendMessage(Component.text(homes ? "▎ Homes  " : "▎ Warps  ",NamedTextColor.AQUA).append(Component.text(homes ? message.replace("warp","home").replace("Warp","Home") : message,NamedTextColor.GRAY)));
+        Responses.info(sender,homes ? "Homes" : "Warps",homes ? message.replace("warp","home").replace("Warp","Home") : message);
     }
     boolean execute(CommandSender sender,String name,String[] args) throws IOException {
         UtilityCommands.requirePermission(sender,"hollowutils."+name);
@@ -101,7 +101,7 @@ final class Warps implements Listener {
                 if(slot<45) { int index=menu.page*45+slot; if(index<menu.names.size()) teleport(p,menu.names.get(index)); }
                 else if(slot==45 && menu.page>0) open(p,menu.page-1);
                 else if(slot==53 && (menu.page+1)*45<menu.names.size()) open(p,menu.page+1);
-            } catch(IllegalArgumentException e) { say(p,e.getMessage()); }
+            } catch(IllegalArgumentException e) { Responses.error(p,e.getMessage()); }
         });
     }
     @EventHandler public void drag(InventoryDragEvent event) { if(event.getView().getTopInventory().getHolder() instanceof Menu) event.setCancelled(true); }

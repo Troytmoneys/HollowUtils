@@ -43,6 +43,7 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
     private volatile boolean ready;
     private NamespacedKey menuKey;
     private UtilityCommands utilities;
+    private EnvironmentCommands environment;
     private ExtraCommands extras;
     private Warps warps;
     private Warps homes;
@@ -58,6 +59,7 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
         Map<String, Command> owned = new HashMap<>();
         for (String name : allCommands()) {
             PluginCommand command = Objects.requireNonNull(getCommand(name));
+            command.permissionMessage(Responses.line("No permission","You do not have permission to use this command.",net.kyori.adventure.text.format.NamedTextColor.RED));
             command.setExecutor(this);
             command.setTabCompleter(this);
             owned.put(name, command);
@@ -94,6 +96,7 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
                 if (!group.deleting) multiverse.configure(group);
             }
             saveData();
+            environment = new EnvironmentCommands(this,utilities);
             warps = new Warps(this);
             homes = new Warps(this,true);
             messages = new SocialMessages(this);
@@ -108,8 +111,15 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
             for (Player player : Bukkit.getOnlinePlayers()) player.kick(Component.text("HollowUtils isolation setup failed. Contact an administrator."));
         }
     }
-    private static Set<String> allCommands() { Set<String> names = new HashSet<>(USER_COMMANDS); names.addAll(ADMIN_COMMANDS); names.addAll(UtilityCommands.COMMANDS); names.addAll(ExtraCommands.NAMES); names.addAll(Moderation.COMMANDS); names.addAll(Warps.COMMANDS); names.addAll(Warps.HOME_COMMANDS); names.addAll(SocialMessages.COMMANDS); return names; }
+    private static Set<String> allCommands() { Set<String> names = new HashSet<>(USER_COMMANDS); names.addAll(ADMIN_COMMANDS); names.addAll(UtilityCommands.COMMANDS); names.addAll(ExtraCommands.NAMES); names.addAll(Moderation.COMMANDS); names.addAll(Warps.COMMANDS); names.addAll(Warps.HOME_COMMANDS); names.addAll(SocialMessages.COMMANDS); names.addAll(EnvironmentCommands.COMMANDS); return names; }
     boolean isMuted(Player player) { return moderation != null && moderation.muted(player); }
+    List<World> serverWorlds(String id) {
+        ServerGroup server=requireServer(id);
+        if(server.deleting) throw new IllegalArgumentException("This server is locked for creation or deletion.");
+        List<World> worlds=server.worlds.stream().map(Bukkit::getWorld).toList();
+        if(worlds.stream().anyMatch(Objects::isNull)) throw new IllegalArgumentException("All worlds in this server must be loaded first.");
+        return worlds;
+    }
     boolean hasServer(String id) { return servers.containsKey(id); }
     void removePunished(Player player, Component notice) {
         ServerGroup lobby = servers.get("lobby");
@@ -134,7 +144,7 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
     private String id(Player player) { ServerGroup s = group(player); return s == null ? "unmanaged:" + player.getWorld().getUID() : s.id; }
     private boolean canEnter(Player player, ServerGroup server) { return server.accessible(player.getUniqueId(), player.hasPermission("hollowutils.bypass")) && (moderation == null || !moderation.banned(player,server.id)); }
     private void remember(Player player) { memberships.put(player.getUniqueId(), id(player)); }
-    private void say(CommandSender sender, String text) { sender.sendMessage(Component.text("▎ HollowUtils  ", net.kyori.adventure.text.format.NamedTextColor.AQUA).append(Component.text(text,net.kyori.adventure.text.format.NamedTextColor.GRAY))); }
+    private void say(CommandSender sender, String text) { Responses.info(sender,"HollowUtils",text); }
     private void saveData() throws IOException {
         for (ServerGroup group : servers.values()) {
             String base = "servers." + group.id + ".";
@@ -164,10 +174,15 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
         if (!player.teleport(spawn(server))) say(player, "Teleport was cancelled.");
     }
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if(!executeCommand(sender,command,label,args)) Responses.usage(sender,command.getUsage().replace("<command>",label));
+        return true;
+    }
+    private boolean executeCommand(CommandSender sender, Command command, String label, String[] args) {
         String name = command.getName();
-        if (!ready) { say(sender, "Isolation is locked. Check the server console."); return true; }
-        if (ADMIN_COMMANDS.contains(name) && !sender.hasPermission("hollowutils.admin")) { say(sender, "You do not have permission."); return true; }
+        if (!ready) { Responses.error(sender, "Isolation is locked. Check the server console."); return true; }
+        if (ADMIN_COMMANDS.contains(name) && !sender.hasPermission("hollowutils.admin")) { Responses.error(sender, "You do not have permission."); return true; }
         try {
+            if (EnvironmentCommands.COMMANDS.contains(name)) return environment.execute(sender,name,args);
             if (SocialMessages.COMMANDS.contains(name)) return messages.execute(sender,name,args);
             if (Warps.HOME_COMMANDS.contains(name)) return homes.execute(sender,name,args);
             if (Warps.COMMANDS.contains(name)) return warps.execute(sender,name,args);
@@ -212,7 +227,7 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
                 }
             }
         } catch (Exception e) {
-            say(sender, e.getMessage() == null ? "Operation failed; check the console." : e.getMessage());
+            Responses.error(sender, e.getMessage() == null ? "Operation failed; check the console." : e.getMessage());
             if (!(e instanceof IllegalArgumentException)) getLogger().log(Level.WARNING, "Command failed: " + name, e);
         }
         return true;
@@ -375,6 +390,7 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
         if (normalized.startsWith("hollowutils:")) normalized = normalized.substring("hollowutils:".length());
         return (USER_COMMANDS.contains(normalized) && player.hasPermission("hollowutils.use"))
                 || (ADMIN_COMMANDS.contains(normalized) && player.hasPermission("hollowutils.admin"))
+                || (EnvironmentCommands.COMMANDS.contains(normalized) && player.hasPermission("hollowutils."+normalized))
                 || (SocialMessages.COMMANDS.contains(normalized) && player.hasPermission(SocialMessages.permission(normalized)))
                 || (Warps.HOME_COMMANDS.contains(normalized) && player.hasPermission("hollowutils."+normalized))
                 || (Warps.COMMANDS.contains(normalized) && player.hasPermission("hollowutils." + normalized))
@@ -385,7 +401,7 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
     }
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true) public void command(PlayerCommandPreprocessEvent event) {
         String label = event.getMessage().substring(1).split(" ", 2)[0];
-        if (!ready || !commandAllowed(event.getPlayer(), label)) { event.setCancelled(true); say(event.getPlayer(), "That command is not enabled on this server."); return; }
+        if (!ready || !commandAllowed(event.getPlayer(), label)) { event.setCancelled(true); Responses.error(event.getPlayer(), "That command is not enabled on this server."); return; }
         event.setMessage("/" + prioritize(event.getMessage().substring(1)));
     }
     private String prioritize(String line) {
@@ -430,7 +446,8 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
         if (!ready || args.length == 0) return List.of();
         List<String> choices = new ArrayList<>();
         String name = command.getName();
-        if (SocialMessages.COMMANDS.contains(name)) choices.addAll(messages.complete(sender,name,args));
+        if (EnvironmentCommands.COMMANDS.contains(name)) choices.addAll(environment.complete(sender,name,args));
+        else if (SocialMessages.COMMANDS.contains(name)) choices.addAll(messages.complete(sender,name,args));
         else if (Warps.HOME_COMMANDS.contains(name)) choices.addAll(homes.complete(sender,name,args));
         else if (Warps.COMMANDS.contains(name)) choices.addAll(warps.complete(sender,name,args));
         else if (Moderation.COMMANDS.contains(name)) choices.addAll(moderation.complete(sender,name,args));

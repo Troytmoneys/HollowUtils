@@ -33,7 +33,7 @@ final class ExtraCommands implements Listener {
         return switch (name) { case "bc" -> "broadcast"; case "ci", "clearinventory" -> "clear"; default -> name; };
     }
     static String permission(String name) { return "hollowutils." + canonical(name); }
-    private void say(CommandSender sender, String message) { sender.sendMessage(Component.text("▎ HollowUtils  ",net.kyori.adventure.text.format.NamedTextColor.AQUA).append(Component.text(message,net.kyori.adventure.text.format.NamedTextColor.GRAY))); }
+    private void say(CommandSender sender, String message) { Responses.info(sender,"HollowUtils",message); }
     private Player player(CommandSender sender) {
         if (sender instanceof Player p) return p;
         throw new IllegalArgumentException("A player is required.");
@@ -49,7 +49,7 @@ final class ExtraCommands implements Listener {
             case "broadcast" -> {
                 if (args.length == 0) return false;
                 // Intentional exception to group-local messaging: all logical servers on this process.
-                Component message = Component.text("[Broadcast] " + String.join(" ", args));
+                Component message = Responses.line("Broadcast",String.join(" ", args),net.kyori.adventure.text.format.NamedTextColor.GOLD);
                 for (Player p : Bukkit.getOnlinePlayers()) p.sendMessage(message);
                 Bukkit.getConsoleSender().sendMessage(message);
             }
@@ -222,7 +222,7 @@ final class ExtraCommands implements Listener {
                 editor.inventory.setItem(slot, editor.items[slot] == null ? null : editor.items[slot].clone());
             } else if (slot == 45) {
                 try { saveKit(editor.id, editor.items); say(p, "Kit saved: " + editor.id); p.closeInventory(); }
-                catch (Exception e) { say(p, "Kit was not saved: " + e.getMessage()); }
+                catch (Exception e) { Responses.error(p, "Kit was not saved: " + e.getMessage()); }
             } else if (slot == 46) p.closeInventory();
         } else if (holder instanceof Enchants view) {
             if (slot < 0 || slot >= 54) return;

@@ -1,6 +1,5 @@
 package io.github.troytmoneys.hollowutils;
 
-import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
@@ -45,7 +44,7 @@ final class SocialMessages implements Listener {
             else if(args[0].equalsIgnoreCase("off")) enabled=false;
             else throw new IllegalArgumentException("Use /socialspy [on|off].");
             if(enabled) spies.add(source.getUniqueId()); else spies.remove(source.getUniqueId());
-            source.sendMessage(Component.text("▎ Social Spy  ",NamedTextColor.AQUA).append(Component.text(enabled ? "ON · observing this server's private messages" : "OFF",NamedTextColor.GRAY)));
+            Responses.info(source,"Social Spy",enabled ? "ON · observing this server's private messages" : "OFF");
             return true;
         }
         if(args.length<2) return false;
@@ -54,13 +53,13 @@ final class SocialMessages implements Listener {
                 .orElseThrow(() -> new IllegalArgumentException("Player not found in your server."));
         String text=String.join(" ",Arrays.copyOfRange(args,1,args.length));
         if(text.isBlank()||text.length()>500) throw new IllegalArgumentException("Messages must be 1–500 characters.");
-        target.sendMessage(Component.text("✉ "+source.getName()+" → you  ",NamedTextColor.AQUA).append(Component.text(text,NamedTextColor.WHITE)));
-        source.sendMessage(Component.text("✉ You → "+target.getName()+"  ",NamedTextColor.AQUA).append(Component.text(text,NamedTextColor.WHITE)));
+        Responses.info(target,"✉ "+source.getName()+" → you",text);
+        Responses.info(source,"✉ You → "+target.getName(),text);
         for(Player spy:players.get()) {
             if(!spies.contains(spy.getUniqueId()) || !spy.hasPermission(permission("socialspy"))) continue;
             if(spy.getUniqueId().equals(source.getUniqueId())||spy.getUniqueId().equals(target.getUniqueId())) continue;
             if(!sameGroup(source,spy)) continue;
-            spy.sendMessage(Component.text("[Spy] "+source.getName()+" → "+target.getName()+"  ",NamedTextColor.DARK_GRAY).append(Component.text(text,NamedTextColor.GRAY)));
+            spy.sendMessage(Responses.line("Spy · "+source.getName()+" → "+target.getName(),text,NamedTextColor.DARK_GRAY));
         }
         return true;
     }

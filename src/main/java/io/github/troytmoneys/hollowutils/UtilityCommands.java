@@ -1,6 +1,5 @@
 package io.github.troytmoneys.hollowutils;
 
-import net.kyori.adventure.text.Component;
 import org.bukkit.GameMode;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.command.CommandSender;
@@ -104,5 +103,5 @@ final class UtilityCommands {
         if (args.length == (fullMode ? 2 : 1)) return targetNames(sender, permission(name) + ".others");
         return List.of();
     }
-    private static void tell(CommandSender sender, String message) { sender.sendMessage(Component.text("▎ HollowUtils  ",net.kyori.adventure.text.format.NamedTextColor.AQUA).append(Component.text(message,net.kyori.adventure.text.format.NamedTextColor.GRAY))); }
+    private static void tell(CommandSender sender, String message) { Responses.success(sender,"Player",message); }
 }
