@@ -11,6 +11,8 @@ final class ServerGroup {
     boolean whitelisted;
     boolean maintenance;
     boolean deleting;
+    boolean unloaded;
+    boolean transitioning;
 
     ServerGroup(String id, List<String> worlds) {
         if (!validId(id) || worlds.isEmpty()) throw new IllegalArgumentException("Invalid server definition");
@@ -23,6 +25,6 @@ final class ServerGroup {
         return List.of("hu_" + id, "hu_" + id + "_nether", "hu_" + id + "_the_end");
     }
     boolean accessible(UUID uuid, boolean bypass) {
-        return !deleting && (bypass || (!maintenance && (!whitelisted || whitelist.contains(uuid))));
+        return !deleting && !unloaded && !transitioning && (bypass || (!maintenance && (!whitelisted || whitelist.contains(uuid))));
     }
 }

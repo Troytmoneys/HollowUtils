@@ -27,6 +27,21 @@ class PunishmentTest {
         assertEquals(original.reason(),revoked.reason()); assertEquals(original.actor(),revoked.actor());
         assertEquals("reviewer",revoked.revokedBy()); assertEquals(150,revoked.revoked());
     }
+    @Test void unifiedBanAndMuteExpirySupportTimedAndInfiniteDurations() {
+        long now=1_000_000;
+        assertEquals(0,Punishment.expiry("infinite",now));
+        assertEquals(0,Punishment.expiry("INFINITE",now));
+        assertEquals(now+30*60_000,Punishment.expiry("30m",now));
+        assertEquals(now+7*86_400_000L,Punishment.expiry("7d",now));
+        assertTrue(entry("BAN",Punishment.expiry("infinite",now)).active(Long.MAX_VALUE));
+        var mute=entry("MUTE",Punishment.expiry("1h",now));
+        assertTrue(mute.active(now+3_600_000-1)); assertFalse(mute.active(now+3_600_000));
+    }
+    @Test void malformedOrOverflowingExpiriesCannotTurnIntoPermanentPunishments() {
+        for(String bad:new String[]{"0m","forever","-3d","reason-without-duration","1e9h"})
+            assertThrows(IllegalArgumentException.class,()->Punishment.expiry(bad,100));
+        assertThrows(IllegalArgumentException.class,()->Punishment.expiry("1h",Long.MAX_VALUE));
+    }
     @Test void durationsHaveExplicitUnitsAndRejectOverflowZeroAndUnboundedInput() {
         assertEquals(30*60_000,Punishment.duration("30m"));
         assertEquals(7*86_400_000L,Punishment.duration("1W"));

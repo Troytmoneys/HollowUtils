@@ -22,7 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 
 final class Moderation implements Listener {
-    static final Set<String> COMMANDS = Set.of("ban", "banip", "unban", "unbanip", "staffrollback", "kick", "mute", "unmute", "tempban", "tempmute", "warn", "unwarn", "warns", "punishments", "history");
+    static final Set<String> COMMANDS = Set.of("ban", "banip", "unban", "unbanip", "staffrollback", "kick", "mute", "unmute", "warn", "unwarn", "warns", "punishments", "history");
     private final HollowUtils plugin;
     private final File file;
     private final YamlConfiguration data;
@@ -174,22 +174,23 @@ final class Moderation implements Listener {
                     && (!name.equals("unwarn") || args[1].equalsIgnoreCase("all") || p.id().startsWith(args[1])),actor(sender));
             message(sender,"REVOKED",changed+" active record(s) revoked; history preserved."); return true;
         }
-        boolean temporary = name.equals("tempban")||name.equals("tempmute");
-        if (temporary && args.length<2) return false;
-        String type = switch(name) { case "ban","tempban" -> "BAN"; case "banip" -> "IP_BAN"; case "mute","tempmute" -> "MUTE"; case "warn" -> "WARN"; case "kick" -> "KICK"; default -> throw new IllegalArgumentException("Unknown moderation action"); };
+        boolean durationBased = name.equals("ban")||name.equals("mute");
+        if (durationBased && args.length<3) return false;
+        String type = switch(name) { case "ban" -> "BAN"; case "banip" -> "IP_BAN"; case "mute" -> "MUTE"; case "warn" -> "WARN"; case "kick" -> "KICK"; default -> throw new IllegalArgumentException("Unknown moderation action"); };
         String subject = type.equals("IP_BAN") ? ipSubject(sender,scope,args[0]) : resolve(sender,scope,args[0]);
         String targetName = type.equals("IP_BAN") ? "IP target" : label(scope,subject);
-        String reason = args.length>(temporary?2:1) ? String.join(" ",Arrays.copyOfRange(args,temporary?2:1,args.length)) : "No reason provided";
+        String reason = args.length>(durationBased?2:1) ? String.join(" ",Arrays.copyOfRange(args,durationBased?2:1,args.length)) : "No reason provided";
+        if (reason.isBlank()) throw new IllegalArgumentException("A reason is required.");
         if (reason.length()>300) throw new IllegalArgumentException("Reason must be 300 characters or fewer.");
         if (!type.equals("WARN")&&!type.equals("KICK")&&records.stream().anyMatch(p -> p.applies(scope,type,subject,System.currentTimeMillis()))) throw new IllegalArgumentException("An active punishment already exists; revoke it first.");
         Player target = online(subject,scope);
         if (type.equals("KICK")&&target==null) throw new IllegalArgumentException("Kick requires an online player in this server.");
-        long now = System.currentTimeMillis(), expires = temporary ? Math.addExact(now,Punishment.duration(args[1])) : 0;
+        long now = System.currentTimeMillis(), expires = durationBased ? Punishment.expiry(args[1],now) : 0;
         Punishment record = new Punishment(UUID.randomUUID().toString(),scope,type,subject,targetName,actor(sender),sender.getName(),reason,now,expires,0,"");
         List<Punishment> next = new ArrayList<>(records); next.add(record); persist(next);
         message(sender,type,targetName+" · "+scope+" · "+reason+" · #"+record.id().substring(0,8));
         Component notice = Component.text("▎ "+type+" · "+scope+"\n",NamedTextColor.RED).append(Component.text(reason,NamedTextColor.WHITE))
-                .append(Component.text("\n"+(expires==0?"": "Until "+Instant.ofEpochMilli(expires))+"\nReference: "+record.id(),NamedTextColor.GRAY));
+                .append(Component.text("\n"+(expires==0?"Duration: infinite": "Until "+Instant.ofEpochMilli(expires))+"\nReference: "+record.id(),NamedTextColor.GRAY));
         if (type.equals("KICK")) { if (target!=null) target.kick(notice); }
         else if (type.equals("BAN")) { if (target!=null) plugin.removePunished(target,notice); }
         else if (type.equals("IP_BAN")) { for (Player p : List.copyOf(Bukkit.getOnlinePlayers())) if (plugin.serverId(p).equals(scope)&&banned(p,scope)) plugin.removePunished(p,notice); }
@@ -219,7 +220,7 @@ final class Moderation implements Listener {
     List<String> complete(CommandSender sender,String name,String[] args) {
         if (!sender.hasPermission("hollowutils."+name) || !(sender instanceof Player source)) return List.of();
         if (args.length==1 && !name.equals("staffrollback")) return Bukkit.getOnlinePlayers().stream().filter(p -> plugin.serverId(p).equals(plugin.serverId(source))&&source.canSee(p)).map(Player::getName).toList();
-        if (args.length==2&&Set.of("tempban","tempmute").contains(name)) return List.of("30m","1h","1d","7d");
+        if (args.length==2&&Set.of("ban","mute").contains(name)) return List.of("30m","1h","1d","7d","infinite");
         if (args.length==2&&name.equals("staffrollback")) return List.of("confirm");
         if (args.length==2&&name.equals("unwarn")) return List.of("all");
         return List.of();

@@ -14,9 +14,14 @@ record Punishment(String id, String server, String type, String subject, String 
     Punishment revoke(long now, String by) {
         return new Punishment(id, server, type, subject, targetName, actor, actorName, reason, created, expires, now, by);
     }
+    static long expiry(String text,long now) {
+        if (text.equalsIgnoreCase("infinite")) return 0;
+        try { return Math.addExact(now,duration(text)); }
+        catch(ArithmeticException e) { throw new IllegalArgumentException("Expiry time is too large."); }
+    }
     static long duration(String text) {
         var matcher = Pattern.compile("([1-9][0-9]*)([smhdw])", Pattern.CASE_INSENSITIVE).matcher(text);
-        if (!matcher.matches()) throw new IllegalArgumentException("Use a duration such as 30m, 12h, 7d or 2w.");
+        if (!matcher.matches()) throw new IllegalArgumentException("Use a duration such as 30m, 12h, 7d, 2w, or infinite.");
         try {
             long unit = switch (matcher.group(2).toLowerCase(Locale.ROOT)) {
                 case "s" -> 1000; case "m" -> 60_000; case "h" -> 3_600_000; case "d" -> 86_400_000; default -> 604_800_000;

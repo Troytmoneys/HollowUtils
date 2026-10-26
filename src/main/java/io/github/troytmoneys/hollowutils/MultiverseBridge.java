@@ -40,6 +40,11 @@ final class MultiverseBridge {
         checkAttempt(invoke(worldManager(), "createWorld", options));
         if (Bukkit.getWorld(name) == null) throw new IllegalStateException("Multiverse did not load " + name);
     }
+    void autoLoad(String name,boolean enabled) {
+        Object world=invoke(invoke(worldManager(), "getWorld", name), "get");
+        checkTry(invoke(world,"setAutoLoad",enabled));
+        checkTry(invoke(worldManager(),"saveWorldsConfig"));
+    }
     void unload(String name) {
         Object world = invoke(invoke(worldManager(), "getWorld", name), "get");
         Object options = invoke(type(coreLoader, "org.mvplugins.multiverse.core.world.options.UnloadWorldOptions"), "world", world);
@@ -50,6 +55,7 @@ final class MultiverseBridge {
         Object world = invoke(invoke(worldManager(), "getWorld", name), "get");
         Object options = invoke(type(coreLoader, "org.mvplugins.multiverse.core.world.options.LoadWorldOptions"), "world", world);
         checkAttempt(invoke(worldManager(), "loadWorld", options));
+        if (Bukkit.getWorld(name)==null) throw new IllegalStateException("World failed to load: "+name);
     }
     void delete(String name) {
         Object option = invoke(worldManager(), "getWorld", name);

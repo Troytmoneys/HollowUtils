@@ -23,10 +23,12 @@ final class ExtraCommands implements Listener {
     private final YamlConfiguration kits;
     private final File deathsFile;
     private final YamlConfiguration deaths;
-    ExtraCommands(HollowUtils plugin, UtilityCommands targets) {
+    ExtraCommands(HollowUtils plugin, UtilityCommands targets) throws IOException {
         this.plugin = plugin; this.targets = targets;
         file = new File(plugin.getDataFolder(), "kits.yml"); kits = YamlConfiguration.loadConfiguration(file);
-        deathsFile = new File(plugin.getDataFolder(), "deaths.yml"); deaths = YamlConfiguration.loadConfiguration(deathsFile);
+        deathsFile = new File(plugin.getDataFolder(), "deaths.yml"); deaths = new YamlConfiguration();
+        if(deathsFile.exists()) try { deaths.load(deathsFile); } catch(Exception e) { throw new IOException("Cannot read deaths.yml",e); }
+        if(SavedLocations.migrate(deaths)) persist(deaths,deathsFile);
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
     }
     static String canonical(String name) {
@@ -56,7 +58,7 @@ final class ExtraCommands implements Listener {
             case "back" -> {
                 if (args.length != 0) return false;
                 Player p = player(sender);
-                Location location = deaths.getLocation(p.getUniqueId() + "." + plugin.serverId(p));
+                Location location = SavedLocations.read(deaths,p.getUniqueId() + "." + plugin.serverId(p));
                 if (location == null || location.getWorld() == null || !plugin.sameGroup(p, location.getWorld())) throw new IllegalArgumentException("No death location in this server.");
                 if (!p.teleport(location)) throw new IllegalArgumentException("Teleport was cancelled.");
                 say(p, "Returned to your death location. Watch for hazards!");
@@ -148,7 +150,7 @@ final class ExtraCommands implements Listener {
     }
     @EventHandler(priority = EventPriority.MONITOR) public void death(PlayerDeathEvent event) {
         Player p = event.getEntity();
-        deaths.set(p.getUniqueId() + "." + plugin.serverId(p), p.getLocation());
+        SavedLocations.write(deaths,p.getUniqueId() + "." + plugin.serverId(p), p.getLocation());
         try { persist(deaths, deathsFile); } catch (IOException e) { plugin.getLogger().warning("Could not persist death location."); }
     }
     private static void persist(YamlConfiguration yaml, File file) throws IOException {

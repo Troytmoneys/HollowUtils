@@ -40,6 +40,7 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
     private YamlConfiguration data;
     private File dataFile;
     private MultiverseBridge multiverse;
+    private ServerLifecycle lifecycle;
     private volatile boolean ready;
     private NamespacedKey menuKey;
     private UtilityCommands utilities;
@@ -68,7 +69,8 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
         commandPriority.claim(getServer().getCommandMap().getKnownCommands());
         try {
             dataFile = new File(getDataFolder(), "servers.yml");
-            data = dataFile.exists() ? YamlConfiguration.loadConfiguration(dataFile) : new YamlConfiguration();
+            data = new YamlConfiguration();
+            if (dataFile.exists()) data.load(dataFile);
             multiverse = new MultiverseBridge(Objects.requireNonNull(getServer().getPluginManager().getPlugin("Multiverse-Core")),
                     Objects.requireNonNull(getServer().getPluginManager().getPlugin("Multiverse-Inventories")));
             ConfigurationSection section = data.getConfigurationSection("servers");
@@ -78,6 +80,7 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
                 group.maintenance = data.getBoolean(base + "maintenance");
                 group.whitelisted = data.getBoolean(base + "whitelisted");
                 group.deleting = data.getBoolean(base + "deleting");
+                group.unloaded = data.getBoolean(base + "unloaded");
                 for (String uuid : data.getStringList(base + "whitelist")) group.whitelist.add(UUID.fromString(uuid));
                 servers.put(id, group);
             }
@@ -91,10 +94,19 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
             for (ServerGroup group : servers.values()) {
                 for (String world : group.worlds) {
                     if (!used.add(world)) throw new IllegalStateException("World belongs to multiple servers: " + world);
-                    if (!group.deleting && Bukkit.getWorld(world) == null) throw new IllegalStateException("Multiverse must load " + world + " before HollowUtils");
+                    if (!group.deleting && !group.unloaded && Bukkit.getWorld(world) == null) throw new IllegalStateException("Multiverse must load " + world + " before HollowUtils");
                 }
-                if (!group.deleting) multiverse.configure(group);
+                if (!group.deleting && !group.unloaded) multiverse.configure(group);
             }
+            lifecycle = new ServerLifecycle(new ServerLifecycle.Backend() {
+                public boolean loaded(String name) { return Bukkit.getWorld(name)!=null; }
+                public boolean occupied(String name) { World world=Bukkit.getWorld(name);return world!=null&&!world.getPlayers().isEmpty(); }
+                public void load(String name) { multiverse.load(name); }
+                public void unload(String name) { multiverse.unload(name); }
+                public void autoLoad(String name,boolean enabled) { multiverse.autoLoad(name,enabled); }
+                public void isolation(ServerGroup group) { multiverse.configure(group); }
+                public void saveRegistry() throws IOException { saveData(); }
+            });
             saveData();
             environment = new EnvironmentCommands(this,utilities);
             warps = new Warps(this);
@@ -102,6 +114,8 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
             messages = new SocialMessages(this);
             extras = new ExtraCommands(this, utilities);
             moderation = new Moderation(this);
+            // Legacy death/spawn locations are migrated while old autoloaded worlds are still available.
+            for (ServerGroup group : servers.values()) if (group.unloaded && !group.deleting) lifecycle.unload(group);
             ready = true;
             for (Player player : Bukkit.getOnlinePlayers()) remember(player);
             refreshVisibility();
@@ -111,10 +125,11 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
             for (Player player : Bukkit.getOnlinePlayers()) player.kick(Component.text("HollowUtils isolation setup failed. Contact an administrator."));
         }
     }
-    private static Set<String> allCommands() { Set<String> names = new HashSet<>(USER_COMMANDS); names.addAll(ADMIN_COMMANDS); names.addAll(UtilityCommands.COMMANDS); names.addAll(ExtraCommands.NAMES); names.addAll(Moderation.COMMANDS); names.addAll(Warps.COMMANDS); names.addAll(Warps.HOME_COMMANDS); names.addAll(SocialMessages.COMMANDS); names.addAll(EnvironmentCommands.COMMANDS); return names; }
+    private static Set<String> allCommands() { Set<String> names = new HashSet<>(USER_COMMANDS); names.addAll(ADMIN_COMMANDS); names.addAll(UtilityCommands.COMMANDS); names.addAll(ExtraCommands.NAMES); names.addAll(Moderation.COMMANDS); names.addAll(Warps.COMMANDS); names.addAll(Warps.HOME_COMMANDS); names.addAll(SocialMessages.COMMANDS); names.addAll(EnvironmentCommands.COMMANDS); names.addAll(ServerLifecycle.COMMANDS); return names; }
     boolean isMuted(Player player) { return moderation != null && moderation.muted(player); }
     List<World> serverWorlds(String id) {
         ServerGroup server=requireServer(id);
+        if(server.unloaded||server.transitioning) throw new IllegalArgumentException("This server is unloaded. Use /loadserver first.");
         if(server.deleting) throw new IllegalArgumentException("This server is locked for creation or deletion.");
         List<World> worlds=server.worlds.stream().map(Bukkit::getWorld).toList();
         if(worlds.stream().anyMatch(Objects::isNull)) throw new IllegalArgumentException("All worlds in this server must be loaded first.");
@@ -146,12 +161,14 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
     private void remember(Player player) { memberships.put(player.getUniqueId(), id(player)); }
     private void say(CommandSender sender, String text) { Responses.info(sender,"HollowUtils",text); }
     private void saveData() throws IOException {
+        SavedLocations.migrate(data);
         for (ServerGroup group : servers.values()) {
             String base = "servers." + group.id + ".";
             data.set(base + "worlds", group.worlds);
             data.set(base + "maintenance", group.maintenance);
             data.set(base + "whitelisted", group.whitelisted);
             data.set(base + "deleting", group.deleting);
+            data.set(base + "unloaded", group.unloaded);
             data.set(base + "whitelist", group.whitelist.stream().map(UUID::toString).sorted().toList());
         }
         // Write then atomically replace; a crash must not truncate the registry.
@@ -163,7 +180,7 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
         } finally { Files.deleteIfExists(temp); }
     }
     private Location spawn(ServerGroup server) {
-        Location saved = data.getLocation("servers." + server.id + ".spawn");
+        Location saved = SavedLocations.read(data,"servers." + server.id + ".spawn");
         if (saved != null && saved.getWorld() != null && server.worlds.contains(saved.getWorld().getName())) return saved;
         return Objects.requireNonNull(Bukkit.getWorld(server.worlds.getFirst()), "Server overworld is not loaded").getSpawnLocation();
     }
@@ -182,6 +199,15 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
         if (!ready) { Responses.error(sender, "Isolation is locked. Check the server console."); return true; }
         if (ADMIN_COMMANDS.contains(name) && !sender.hasPermission("hollowutils.admin")) { Responses.error(sender, "You do not have permission."); return true; }
         try {
+            if (ServerLifecycle.COMMANDS.contains(name)) {
+                UtilityCommands.requirePermission(sender,"hollowutils."+name);
+                if (args.length!=1) return false;
+                ServerGroup server=requireServer(args[0]);
+                if(name.equals("loadserver")) lifecycle.load(server); else lifecycle.unload(server);
+                Responses.success(sender,"Servers",server.id+" · "+(server.unloaded?"unloaded":"loaded")+" · "+server.worlds.size()+" world(s)");
+                refreshVisibility();
+                return true;
+            }
             if (EnvironmentCommands.COMMANDS.contains(name)) return environment.execute(sender,name,args);
             if (SocialMessages.COMMANDS.contains(name)) return messages.execute(sender,name,args);
             if (Warps.HOME_COMMANDS.contains(name)) return homes.execute(sender,name,args);
@@ -201,7 +227,7 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
                 ServerGroup server = Objects.requireNonNull(group(player), "You are outside a managed server.");
                 if (name.equals("spawn")) join(player, server);
                 else {
-                    data.set("servers." + server.id + ".spawn", player.getLocation());
+                    SavedLocations.write(data,"servers." + server.id + ".spawn", player.getLocation());
                     saveData(); say(sender, "Spawn set for " + server.id + ".");
                 }
             } else if (name.equals("createserver")) {
@@ -296,7 +322,7 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
             for (String name : unloaded) {
                 try { multiverse.load(name); }
                 catch (Exception e) {
-                    server.deleting = true;
+                    server.unloaded = true;
                     getLogger().log(Level.SEVERE, "Backup reload failed; server locked: " + name, e);
                     saveData();
                 }
@@ -390,6 +416,7 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
         if (normalized.startsWith("hollowutils:")) normalized = normalized.substring("hollowutils:".length());
         return (USER_COMMANDS.contains(normalized) && player.hasPermission("hollowutils.use"))
                 || (ADMIN_COMMANDS.contains(normalized) && player.hasPermission("hollowutils.admin"))
+                || (ServerLifecycle.COMMANDS.contains(normalized) && player.hasPermission("hollowutils."+normalized))
                 || (EnvironmentCommands.COMMANDS.contains(normalized) && player.hasPermission("hollowutils."+normalized))
                 || (SocialMessages.COMMANDS.contains(normalized) && player.hasPermission(SocialMessages.permission(normalized)))
                 || (Warps.HOME_COMMANDS.contains(normalized) && player.hasPermission("hollowutils."+normalized))
@@ -446,7 +473,10 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
         if (!ready || args.length == 0) return List.of();
         List<String> choices = new ArrayList<>();
         String name = command.getName();
-        if (EnvironmentCommands.COMMANDS.contains(name)) choices.addAll(environment.complete(sender,name,args));
+        if (ServerLifecycle.COMMANDS.contains(name)) {
+            if(args.length==1 && sender.hasPermission("hollowutils."+name)) servers.values().stream().filter(s->!s.id.equals("lobby")).map(s->s.id).forEach(choices::add);
+        }
+        else if (EnvironmentCommands.COMMANDS.contains(name)) choices.addAll(environment.complete(sender,name,args));
         else if (SocialMessages.COMMANDS.contains(name)) choices.addAll(messages.complete(sender,name,args));
         else if (Warps.HOME_COMMANDS.contains(name)) choices.addAll(homes.complete(sender,name,args));
         else if (Warps.COMMANDS.contains(name)) choices.addAll(warps.complete(sender,name,args));

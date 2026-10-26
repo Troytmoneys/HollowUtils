@@ -112,7 +112,7 @@ commands:
     permission: hollowutils.deletekit
   ban:
     description: Server-scoped moderation - ban
-    usage: /ban <player|uuid> [reason]
+    usage: /ban <player|uuid> <duration|infinite> <reason>
     permission: hollowutils.ban
   banip:
     description: Server-scoped moderation - banip
@@ -136,20 +136,12 @@ commands:
     permission: hollowutils.kick
   mute:
     description: Server-scoped moderation - mute
-    usage: /mute <player|uuid> [reason]
+    usage: /mute <player|uuid> <duration|infinite> <reason>
     permission: hollowutils.mute
   unmute:
     description: Server-scoped moderation - unmute
     usage: /unmute <player|uuid>
     permission: hollowutils.unmute
-  tempban:
-    description: Server-scoped moderation - tempban
-    usage: /tempban <player|uuid> <duration> [reason]
-    permission: hollowutils.tempban
-  tempmute:
-    description: Server-scoped moderation - tempmute
-    usage: /tempmute <player|uuid> <duration> [reason]
-    permission: hollowutils.tempmute
   warn:
     description: Server-scoped moderation - warn
     usage: /warn <player|uuid> [reason]
@@ -266,6 +258,14 @@ commands:
     description: Server-local thunder control
     usage: /thunder [server-for-console]
     permission: hollowutils.thunder
+  loadserver:
+    description: loadserver all worlds of a logical server without deleting data
+    usage: /loadserver <name>
+    permission: hollowutils.loadserver
+  unloadserver:
+    description: unloadserver all worlds of a logical server without deleting data
+    usage: /unloadserver <name>
+    permission: hollowutils.unloadserver
 permissions:
   hollowutils.use:
     default: true
@@ -334,10 +334,6 @@ permissions:
     default: op
   hollowutils.unmute:
     default: op
-  hollowutils.tempban:
-    default: op
-  hollowutils.tempmute:
-    default: op
   hollowutils.warn:
     default: op
   hollowutils.unwarn:
@@ -393,4 +389,8 @@ permissions:
   hollowutils.flyspeed.others:
     default: op
   hollowutils.walkspeed.others:
+    default: op
+  hollowutils.loadserver:
+    default: op
+  hollowutils.unloadserver:
     default: op

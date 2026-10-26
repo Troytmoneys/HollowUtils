@@ -145,12 +145,12 @@ New features compile against Paper 1.21.11; the existing 20 automated tests pass
 
 ## Modern moderation
 
-Punishments are scoped to the issuing player's **current logical server**, including all of its dimensions. Operators do not bypass bans. Console explicitly selects scope: `ban --server survival Alex Griefing`. All commands take ownership of their unqualified labels just like the Essentials-style commands above.
+Punishments are scoped to the issuing player's **current logical server**, including all of its dimensions. Operators do not bypass bans. Console explicitly selects scope: `ban --server survival Alex 7d Griefing`. All commands take ownership of their unqualified labels just like the Essentials-style commands above.
 
 | Command | Usage |
 | --- | --- |
-| `/ban`, `/mute`, `/warn` | `<player-or-uuid> [reason]` |
-| `/tempban`, `/tempmute` | `<player-or-uuid> <duration> [reason]` |
+| `/ban`, `/mute` | `<player-or-uuid> <duration-or-infinite> <reason>` |
+| `/warn` | `<player-or-uuid> [reason]` |
 | `/kick` | `<online-player> [reason]` |
 | `/banip` | `<player-or-literal-ip> [reason]` |
 | `/unban`, `/unmute` | `<player-or-uuid>` |
@@ -163,7 +163,7 @@ Punishments are scoped to the issuing player's **current logical server**, inclu
 
 Each command requires `hollowutils.<command>`, defaulting to operators. Grant staff only the actions they need; `staffrollback` is a powerful separate permission. No selectors, wildcard players or partial-name matching. Offline names must have been seen in the current logical server; explicit UUIDs support offline moderation without external identity lookups. Suggestions show visible online players in the same scope. Reasons are plain text, limited to 300 characters.
 
-Durations accept one positive integer and `s`, `m`, `h`, `d` or `w`, for example `30m`, `12h`, `7d`. The maximum is 3650 days; expiry takes effect automatically even across restarts. Revocations retain the original reason, issuer, creation/expiry timestamps, and record who revoked them. Rollback requires repeating the command with `confirm` within 30 seconds. It revokes active bans, IP bans, mutes and warnings; it cannot undo kicks or restore gameplay changes and does **not** roll back blocks, inventories or worlds. Expired and already revoked entries remain intact.
+Durations accept one positive integer and `s`, `m`, `h`, `d` or `w`, for example `30m`, `12h`, `7d`. Use `infinite` for no expiry; finite durations have a maximum of 3650 days. Expiry takes effect automatically even across restarts. Revocations retain the original reason, issuer, creation/expiry timestamps, and record who revoked them. Rollback requires repeating the command with `confirm` within 30 seconds. It revokes active bans, IP bans, mutes and warnings; it cannot undo kicks or restore gameplay changes and does **not** roll back blocks, inventories or worlds. Expired and already revoked entries remain intact.
 
 History displays six records per page, with hover details and clickable IDs that copy the full reference. Next-page links run the corresponding history command. Active/revoked/expired/executed states remain distinct. IP bans are recorded separately; player history also shows bans matching that player's last recorded IP hash in this scope.
 
@@ -257,3 +257,34 @@ Time changes affect all loaded dimensions in the selected group; weather affects
 All command families now use a shared Adventure component response style: bold section headings, subdued separators, gray body text, aqua information, green success, red errors and yellow usage hints. Permission denials and missing/extra argument hints use the same style. Broadcasts use a gold heading; private messages, social spy and moderation history keep their specialized layouts while sharing the same heading style. Player-provided text remains literal and cannot inject formatting or click actions. Existing moderation hover details, clickable record IDs and pagination remain available.
 
 Validation: **51 passing tests**, including speed limits/resets, flight toggles, target permissions, cross-server target filtering, failed-save behavior, creative-mode safeguards, full weather-state transitions, clear-weather timer ordering and cancellation handling. Live Paper checks for flight restoration, dimension changes, weather/time plugin coexistence and message rendering still need staging validation. Restart Paper after replacing the JAR; do not hot reload.
+
+
+## Load and unload logical servers
+
+- `/unloadserver <name>` saves and unloads **all registered dimensions** of an empty logical server without deleting any world or player-profile data.
+- `/loadserver <name>` loads all of its registered dimensions, verifies the MVI isolation group, and enables entry again only after every step succeeds.
+
+Permissions are `hollowutils.unloadserver` and `hollowutils.loadserver`, both operator by default. They work from console or in-game and take priority over matching command registrations. Move every player out first: occupancy in any dimension rejects the entire request before changing anything. The fallback lobby cannot be loaded/unloaded through these commands. Groups locked for creation/deletion must have that operation resolved first.
+
+Unloaded servers stay hidden from the server selector and normal join suggestions; teleport access remains denied even to bypass users. Staff load/unload completion still lists them for management. Maintenance, whitelist, bans, homes, warps, spawn, movement settings and MVI profiles are preserved. Loading does not override other access restrictions.
+
+The `unloaded` flag is saved in `servers.yml`, and Multiverse autoload is disabled for each unloaded dimension, so the state persists across Paper restarts. A successful `/loadserver` restores Multiverse autoload. If another plugin autoloads a flagged server during startup, HollowUtils unloads it again before allowing joins. Missing/corrupt worlds are not recreated by loading; Multiverse's existing-world checks stay enabled. If a world operation or registry save fails, the whole group stays locked even when some dimensions are loaded. Correct the console error, then retry `/loadserver <name>` or `/unloadserver <name>`; do not delete the registry to bypass the lock. Loading an already loaded empty group or unloading an already unloaded group safely reconciles all worlds.
+
+World backups can still be made while a group is unloaded and do not load it. Backups temporarily unloading an online group still reload its previously loaded worlds. A failed backup reload now leaves an unloaded lock recoverable via `/loadserver`, rather than marking the group for deletion.
+
+Spawn/death records automatically migrate to UUID-based coordinate maps that deserialize without loaded worlds. This preserves `/setspawn` and `/back` data across unload/restart/load cycles. The registry and death files use strict loading so malformed data is reported rather than silently replaced. Back up `servers.yml`, `deaths.yml`, Multiverse configuration and MVI profiles with the rest of the stopped server before upgrading.
+
+## Unified ban and mute duration syntax
+
+`/tempban` and `/tempmute` are removed. Use the existing `hollowutils.ban` and `hollowutils.mute` permissions with:
+
+```text
+/ban Alex 7d Griefing
+/ban Alex infinite Repeated rule violations
+/mute Alex 30m Chat spam
+/mute Alex infinite Repeated harassment
+```
+
+Duration **and reason are required** for `/ban` and `/mute`. `infinite` is case-insensitive and means no expiry; timed values accept `s/m/h/d/w`. The duration argument offers completions including `infinite`. For console, keep the scope prefix: `ban --server survival Alex 7d Griefing`. IP bans, warnings and kick syntax remain unchanged. Existing permanent/temporary records, expiry timestamps and history are preserved; `/unban`, `/unmute` and staff rollback work as before. Staff previously granted only `hollowutils.tempban`/`hollowutils.tempmute` need the replacement ban/mute permissions.
+
+Validation: **62 passing tests** covering group-wide transitions, preflight occupancy, partial failures and retries, save failures, access locks, protected lobby, legacy location migration and timed/infinite punishment expiry. Live Multiverse load/unload, restart persistence and migrated spawn/death return still require staging verification. Restart Paper after installing this update; hot reload remains unsupported.
