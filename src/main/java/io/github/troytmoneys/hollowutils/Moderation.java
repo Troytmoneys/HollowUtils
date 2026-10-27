@@ -31,9 +31,13 @@ final class Moderation implements Listener {
     private final Map<UUID, Long> notices = new ConcurrentHashMap<>();
     private final Map<String, Long> confirmations = new HashMap<>();
     private final String salt;
+    private final RankHierarchy.Lookup rankLookup;
 
     Moderation(HollowUtils plugin) throws IOException {
-        this.plugin = plugin; file = new File(plugin.getDataFolder(), "moderation.yml");
+        this.plugin = plugin;
+        rankLookup=plugin.getServer().getPluginManager().isPluginEnabled("LuckPerms")?new LuckPermsRanks():null;
+        if(rankLookup==null)plugin.getLogger().warning("LuckPerms is absent: player-issued punishment changes are locked; console and history remain available.");
+        file = new File(plugin.getDataFolder(), "moderation.yml");
         data = new YamlConfiguration();
         if (file.exists()) {
             try { data.load(file); } catch (Exception e) { throw new IOException("Cannot read moderation ledger; refusing to discard punishments", e); }
@@ -84,15 +88,18 @@ final class Moderation implements Listener {
     }
     private void remember(Player p) {
         String scope = plugin.serverId(p); scopes.put(p.getUniqueId(),scope);
-        data.set("players." + scope + "." + p.getUniqueId(),p.getName());
+        data.set("players." + scope + "." + p.getUniqueId(),plugin.realName(p));
         if (p.getAddress()!=null) data.set("addresses."+scope+"."+p.getUniqueId(),ip(p.getAddress().getAddress()));
         try { persist(records); } catch (IOException e) { plugin.getLogger().severe("Could not persist moderation player index"); }
     }
     private String resolve(CommandSender sender, String scope, String value) {
-        for (Player p : Bukkit.getOnlinePlayers()) if (p.getName().equalsIgnoreCase(value) && plugin.serverId(p).equals(scope)
-                && (!(sender instanceof Player source) || source.canSee(p))) return p.getUniqueId().toString();
+        Set<String> matches=new HashSet<>();
+        for (Player p : Bukkit.getOnlinePlayers()) if ((p.getName().equalsIgnoreCase(value)||plugin.realName(p).equalsIgnoreCase(value)) && plugin.serverId(p).equals(scope)
+                && (!(sender instanceof Player source) || source.canSee(p))) matches.add(p.getUniqueId().toString());
         var section = data.getConfigurationSection("players." + scope);
-        if (section != null) for (String uuid : section.getKeys(false)) if (value.equalsIgnoreCase(uuid) || value.equalsIgnoreCase(section.getString(uuid))) return uuid;
+        if (section != null) for (String uuid : section.getKeys(false)) if (value.equalsIgnoreCase(uuid) || value.equalsIgnoreCase(section.getString(uuid))) matches.add(uuid);
+        if(matches.size()>1)throw new IllegalArgumentException("This name matches multiple accounts. Use the exact target UUID for moderation.");
+        if(matches.size()==1)return matches.iterator().next();
         // UUIDs are unambiguous for offline moderation; names must have been seen in this logical server.
         try { return UUID.fromString(value).toString(); } catch (IllegalArgumentException e) { throw new IllegalArgumentException("No known player by that name in this server. Use an exact UUID for offline players."); }
     }
@@ -121,7 +128,33 @@ final class Moderation implements Listener {
             if (!plugin.hasServer(scope)) throw new IllegalArgumentException("Unknown logical server.");
         }
         String[] args = parts.toArray(String[]::new);
-        if (args.length == 0) return false;
+        int minimum=Set.of("ban","mute").contains(name)?3:name.equals("unwarn")?2:1;
+        if(args.length<minimum)return false;
+        if(sender instanceof Player source&&!Set.of("history","punishments","warns").contains(name)) {
+            if(rankLookup==null)throw new IllegalArgumentException("LuckPerms is required for player-issued punishment changes. Install LuckPerms or use console.");
+            List<RankHierarchy.Check> checks=rankChecks(sender,name,args,scope);
+            Set<UUID> ids=new HashSet<>();ids.add(source.getUniqueId());checks.forEach(check->ids.add(check.target()));
+            rankLookup.load(ids,source).whenComplete((snapshot,failure)-> {
+                if(!plugin.isEnabled()) { if(snapshot!=null)snapshot.close();return; }
+                Bukkit.getScheduler().runTask(plugin,()-> {
+                    try {
+                        if(failure!=null)throw new IllegalStateException("LuckPerms rank lookup failed. No punishment was changed.",failure);
+                        if(!source.isOnline())return;
+                        if(!plugin.serverId(source).equals(scope))throw new IllegalArgumentException("You changed logical servers while ranks were loading. Run the command again.");
+                        UtilityCommands.requirePermission(source,"hollowutils."+name);
+                        RankHierarchy.require(source.getUniqueId(),rankChecks(source,name,args,scope),snapshot::weight);
+                        if(!executeScoped(source,name,args,scope))Responses.usage(source,"/"+name+" "+Objects.requireNonNull(plugin.getCommand(name)).getUsage().replaceFirst("^/[^ ]+ ?", ""));
+                    } catch(Exception e) {
+                        Responses.error(source,e.getMessage()==null?"Punishment change failed; check console.":e.getMessage());
+                        if(!(e instanceof IllegalArgumentException))plugin.getLogger().log(java.util.logging.Level.WARNING,"Moderation failed after rank lookup",e);
+                    } finally { if(snapshot!=null)snapshot.close(); }
+                });
+            });
+            return true;
+        }
+        return executeScoped(sender,name,args,scope);
+    }
+    private boolean executeScoped(CommandSender sender,String name,String[] args,String scope) throws IOException {
         if (Set.of("history","punishments","warns").contains(name)) {
             if (args.length > 2) return false;
             String uuid = InetAddresses.isInetAddress(args[0]) ? ipSubject(sender,scope,args[0]) : resolve(sender,scope,args[0]);
@@ -186,7 +219,7 @@ final class Moderation implements Listener {
         Player target = online(subject,scope);
         if (type.equals("KICK")&&target==null) throw new IllegalArgumentException("Kick requires an online player in this server.");
         long now = System.currentTimeMillis(), expires = durationBased ? Punishment.expiry(args[1],now) : 0;
-        Punishment record = new Punishment(UUID.randomUUID().toString(),scope,type,subject,targetName,actor(sender),sender.getName(),reason,now,expires,0,"");
+        Punishment record = new Punishment(UUID.randomUUID().toString(),scope,type,subject,targetName,actor(sender),sender instanceof Player staff?plugin.realName(staff):sender.getName(),reason,now,expires,0,"");
         List<Punishment> next = new ArrayList<>(records); next.add(record); persist(next);
         message(sender,type,targetName+" · "+scope+" · "+reason+" · #"+record.id().substring(0,8));
         Component notice = Component.text("▎ "+type+" · "+scope+"\n",NamedTextColor.RED).append(Component.text(reason,NamedTextColor.WHITE))
@@ -196,6 +229,37 @@ final class Moderation implements Listener {
         else if (type.equals("IP_BAN")) { for (Player p : List.copyOf(Bukkit.getOnlinePlayers())) if (plugin.serverId(p).equals(scope)&&banned(p,scope)) plugin.removePunished(p,notice); }
         else if (target!=null) target.sendMessage(notice);
         return true;
+    }
+    private String staffIdentity(String scope,String input) {
+        Set<String> ids=new HashSet<>();
+        records.stream().filter(p->p.server().equals(scope)&&(p.actor().equalsIgnoreCase(input)||p.actorName().equalsIgnoreCase(input))).forEach(p->ids.add(p.actor()));
+        if(ids.size()!=1)throw new IllegalArgumentException("Specify an unambiguous staff UUID/name (or CONSOLE).");
+        return ids.iterator().next();
+    }
+    private RankHierarchy.Check issuer(String id) {
+        if(id.equals("CONSOLE"))throw new IllegalArgumentException("Only console can revoke punishments issued by console.");
+        return new RankHierarchy.Check(UUID.fromString(id),true);
+    }
+    private List<RankHierarchy.Check> rankChecks(CommandSender sender,String name,String[] args,String scope) {
+        long now=System.currentTimeMillis();List<RankHierarchy.Check> checks=new ArrayList<>();
+        if(name.equals("staffrollback")) { checks.add(issuer(staffIdentity(scope,args[0])));return checks; }
+        if(Set.of("unban","unbanip","unmute","unwarn").contains(name)) {
+            String type=switch(name) { case "unban"->"BAN";case "unbanip"->"IP_BAN";case "unmute"->"MUTE";default->"WARN"; };
+            String subject=name.equals("unbanip")?ipSubject(sender,scope,args[0]):resolve(sender,scope,args[0]);
+            records.stream().filter(p->p.applies(scope,type,subject,now))
+                    .filter(p->!name.equals("unwarn")||args[1].equalsIgnoreCase("all")||p.id().startsWith(args[1]))
+                    .map(p->issuer(p.actor())).forEach(checks::add);
+            return checks;
+        }
+        if(name.equals("banip")) {
+            String address=ipSubject(sender,scope,args[0]);Set<UUID> affected=new HashSet<>();
+            var known=data.getConfigurationSection("addresses."+scope);
+            if(known!=null)for(String id:known.getKeys(false))if(address.equals(known.getString(id)))affected.add(UUID.fromString(id));
+            for(Player player:Bukkit.getOnlinePlayers())if(plugin.serverId(player).equals(scope)&&player.getAddress()!=null&&address.equals(ip(player.getAddress().getAddress())))affected.add(player.getUniqueId());
+            if(affected.isEmpty())throw new IllegalArgumentException("No player identities are known for that IP. Use console for an unassociated IP ban.");
+            affected.forEach(id->checks.add(new RankHierarchy.Check(id,false)));
+        } else checks.add(new RankHierarchy.Check(UUID.fromString(resolve(sender,scope,args[0])),false));
+        return checks;
     }
     private int revoke(Predicate<Punishment> filter,String by) throws IOException {
         long now = System.currentTimeMillis(); int count=0; List<Punishment> next=new ArrayList<>();

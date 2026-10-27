@@ -1,6 +1,6 @@
 # HollowUtils
 
-[Download the built plugin JAR](downloads/hollowutils-1.0.0.jar?raw=true). Stop Paper, put this file in `plugins/` alongside Multiverse-Core and Multiverse-Inventories, then start Paper. This build has passed automated tests; live integration testing remains.
+[Download the built plugin JAR](downloads/hollowutils-1.1.0.jar?raw=true). Stop Paper, put this file in `plugins/` alongside Multiverse-Core and Multiverse-Inventories, then start Paper. This build has passed automated tests; live integration testing remains.
 
 Java 21 plugin targeting **Paper 1.21.11**, with **Multiverse-Core 5.x** and **Multiverse-Inventories 5.x**. Use recent releases exposing the current `MultiverseCoreApi` and `MultiverseInventoriesApi` APIs (including advancement, statistics and recipe shares). Older Multiverse 4.x is unsupported. Folia is unsupported.
 
@@ -10,7 +10,7 @@ A “server” is a logical group of one or three worlds on one Paper process. `
 
 1. Install a **JDK 21** and Maven 3.9+, then run `mvn -B verify` in this directory.
 2. Stop your Paper 1.21.11 server. Back up the entire existing server first.
-3. Install compatible Multiverse-Core and Multiverse-Inventories releases in `plugins/` along with `target/hollowutils-1.0.0.jar`. Start normally; do not use `/reload` or plugin hot loaders.
+3. Install compatible Multiverse-Core and Multiverse-Inventories releases in `plugins/` along with `target/hollowutils-1.1.0.jar`. Start normally; do not use `/reload` or plugin hot loaders.
 4. Check the console for `Logical servers loaded`. The primary lobby is automatically registered. Create your first server with `/createserver survival` from the console or as an operator. Generation can pause ticks.
 5. Join using `/server survival`, stand in a safe location and use `/setspawn`.
 
@@ -48,7 +48,7 @@ Permissions: `hollowutils.use` defaults to everyone; `hollowutils.admin` default
 
 HollowUtils takes ownership of its **unqualified command names**, including `/spawn`, `/gamemode`, `/gm`, `/gmc` and `/heal`, even if Essentials or another plugin registered them first. It claims the Paper command map on enable, again after server startup and after later plugin enables, and refreshes the client command tree. Player/console command events route these names explicitly to `hollowutils:<command>`. It restores displaced command-map entries when disabled. Restart after replacing the JAR; hot loading remains unsupported.
 
-Other plugins' namespaced commands (for example `essentials:gmc`) are not replaced. They remain blocked for players by the normal command allowlist unless explicitly permitted, and console can still invoke them deliberately. This prioritizes normal registration conflicts; another plugin deliberately cancelling or rewriting command events can still interfere. It does not replace unrelated commands that HollowUtils does not implement.
+Other plugins' namespaced commands (for example `essentials:gmc`) are not replaced. Namespaced roots are hidden from suggestions, but can still be typed manually when the owning plugin permits them. This prioritizes normal registration conflicts; another plugin deliberately cancelling or rewriting command events can still interfere. It does not replace unrelated commands that HollowUtils does not implement.
 
 The new utility permissions default to operators:
 
@@ -73,10 +73,10 @@ Player targets use exact online names, case-insensitively. Selectors and partial
 - Paper chat audiences, join/quit/death messages and advancement announcements are scoped to the current group; console keeps chat auditing.
 - Cross-group players are hidden using Paper's player visibility API, including the normal tab list and player entities. HollowUtils never re-shows players another plugin has hidden.
 - Portal destinations are redirected to the current group's dimensions. Bed/respawn destinations outside the group fall back to its spawn. Non-player portal travel is blocked to prevent item/mob transfers.
-- All player commands except the HollowUtils commands are blocked by default, including namespaced alternatives. Only authorized roots appear in the command tree. HollowUtils completions never fall back to Bukkit's global player-name suggestions.
+- Other plugins' unqualified commands appear normally under their own permission rules. Namespaced roots such as `hollowutils:spawn` and `minecraft:give` are hidden from suggestions. HollowUtils roots retain their permission checks and scoped completion.
 - Whitelist/maintenance applies to teleports by other plugins too. Direct console administration remains available.
 
-`allowed-commands` in `config.yml` can enable additional exact command labels. Only add commands whose permissions, completion, player lookup and stored data are safe across groups. Adding commands such as `execute`, `tp`, `msg`, global player lists, or their aliases can defeat isolation. Restart after changes.
+The legacy `allowed-commands` setting is no longer used. Third-party plugins now own their command permissions, player lookup and data scope. Configure their cross-server chat, player lists and messaging rules separately; HollowUtils cannot make arbitrary external commands server-local.
 
 ## Backups and recovery
 
@@ -95,7 +95,7 @@ Validated here: Java 21 bytecode compilation against Paper 1.21.11 API, packaged
 Staging checklist with two non-op accounts:
 
 1. Create `alpha` and `beta`; use the selector and direct join. Verify separate inventory, armor, XP, hunger, effects, ender chest, advancements, statistics and recipes; switch back and restart to check persistence.
-2. Confirm players in different groups cannot see one another in chat/tab, entities, death/advancement announcements or command suggestions. Try namespaced commands and forbidden aliases.
+2. Confirm players in different groups cannot see one another in chat/tab, entities, death/advancement announcements or command suggestions. Verify namespaced roots are hidden from suggestions, normal third-party commands remain available, and owned aliases still enforce permissions.
 3. Enter both Nether and End portals and return; confirm destinations stay inside the group. Test beds, death, End exit, and `/spawn` facing.
 4. Enable whitelist and maintenance while a non-bypass account is inside. Confirm evacuation and denied reentry; verify operator bypass separately.
 5. Move players out, back up, inspect the ZIP, and test a restore on a separate stopped staging server. Confirm occupied deletion is rejected, confirmation expires, and lobby deletion is refused.
@@ -167,7 +167,7 @@ Durations accept one positive integer and `s`, `m`, `h`, `d` or `w`, for example
 
 History displays six records per page, with hover details and clickable IDs that copy the full reference. Next-page links run the corresponding history command. Active/revoked/expired/executed states remain distinct. IP bans are recorded separately; player history also shows bans matching that player's last recorded IP hash in this scope.
 
-A ban removes a player from the affected group to an accessible lobby, or disconnects them if no fallback is available. Teleport and rejoin access checks prevent reentry; a ban in the lobby denies lobby access and disconnects when no fallback is possible. `/kick` disconnects the player from Paper. Mutes block normal Paper chat in the affected group. Third-party messaging commands or custom plugin chat channels require their own mute integration; do not allowlist commands that bypass moderation. Global staff broadcasts remain a privileged command.
+A ban removes a player from the affected group to an accessible lobby, or disconnects them if no fallback is available. Teleport and rejoin access checks prevent reentry; a ban in the lobby denies lobby access and disconnects when no fallback is possible. `/kick` disconnects the player from Paper. Mutes block normal Paper chat in the affected group. Third-party messaging commands or custom plugin chat channels require their own mute integration and permissions. Global staff broadcasts remain a privileged command.
 
 `moderation.yml` stores the audit ledger, player-name index and salted IP hashes; raw IP addresses are not persisted by this feature. Literal addresses are parsed without DNS lookups. A name-based IP unban uses the last known address hash even when the player is offline or has moved to lobby. Shared IPs affect every matching player within the chosen scope; proxy deployments must configure trusted address forwarding correctly. Existing Bukkit/Essentials bans are neither imported nor removed, so explicit namespaced commands or pre-existing global ban lists can still affect access independently.
 
@@ -207,7 +207,7 @@ Warp records persist by world UUID in `plugins/HollowUtils/warps.yml`; include i
 
 Messaging aliases: `/pm`, `/message`, `/whisper` and `/privatemanager` all use exactly the `/msg <player> <message>` syntax and `hollowutils.msg` permission. They receive the same command priority as the other HollowUtils commands. Messages use exact online player names (case-insensitively), 1–500 plain-text characters, and cannot be sent to yourself. Targets and suggestions are restricted to visible players in the sender's current logical server, including its Nether/End. Hidden, missing and cross-server recipients receive the same lookup error. This feature does not provide a separate `/privatemanager` settings menu.
 
-HollowUtils mutes and temporary mutes also block sending through **every** private-message alias. Receiving messages remains allowed. This does not control third-party messaging plugins that you explicitly allowlist.
+HollowUtils mutes and temporary mutes also block sending through **every** private-message alias. Receiving messages remains allowed. This does not control third-party messaging plugins; their own permissions and mute integration remain in control.
 
 Social spy shows all successfully delivered HollowUtils private messages in the opted-in staff member's current logical server, except conversations they already participate in. It never forwards messages from another logical server and does not hook third-party plugin messages. Spy permission is checked for every delivery; subscriptions clear on logout, reconnect, restart or changing logical server (dimension travel within the same group keeps the setting). It does not persist message content or forward PMs to console. Give this permission only to trusted staff and inform players that authorized staff can moderate private messages.
 
@@ -317,6 +317,72 @@ Use registry IDs such as `/enchant sharpness 5`. Enchanted books use stored ench
 
 ### Permission audit
 
-See [PERMISSIONS.md](PERMISSIONS.md) for **every command and permission node**. Every registered command now has a matching declaration and runtime permission gate. Core commands such as `/createserver` and `/setspawn` have individual permissions; legacy `hollowutils.admin` and `hollowutils.use` remain parent grants. Aliases intentionally share canonical permissions. The allowlist cannot bypass permissions on HollowUtils-owned commands.
+See [PERMISSIONS.md](PERMISSIONS.md) for **every command and permission node**. Every registered command now has a matching declaration and runtime permission gate. Core commands such as `/createserver` and `/setspawn` have individual permissions; legacy `hollowutils.admin` and `hollowutils.use` remain parent grants. Aliases intentionally share canonical permissions. Other plugins' visibility cannot bypass permissions on HollowUtils-owned commands.
 
 Validation: **77 passing tests**, including complete descriptor/runtime permission matching, legacy grants, god-mode toggling/targeting/scope, air refill to a custom maximum, instant-break cancellation and permission checks, atomic inventory allocation/overflow rejection, and explicit rejection of unsupported enchantment levels. Live block protection, damage cancellation, item/enchantment round trips and coexistence with other plugins remain to be checked on staging. Restart Paper after updating the JAR.
+
+
+## 1.1.0 — ranks, appearance, command visibility and RTP
+
+This medium feature update follows [VERSIONING.md](VERSIONING.md): minor changes increment `0.0.1`, medium releases `0.1.0`, and major releases `1.0.0`. Maven supplies the installed version to `plugin.yml`.
+
+New commands:
+
+| Command | Behavior | Permission (default) |
+| --- | --- | --- |
+| `/instabreak [on\|off]` | Alias of `/togglebreakdelay` | `hollowutils.togglebreakdelay` (op) |
+| `/rtp [player]` | Find safe ground in the current group's overworld | `hollowutils.rtp` (everyone); `.rtp.others` for another player (op) |
+| `/vanish [on\|off]` | Hide yourself from normal players in tab/entity visibility and local announcements/chat | `hollowutils.vanish` (op) |
+| `/disguise` | Open appearance editor | `hollowutils.disguise` (op) |
+| `/disguise off` | Restore real name, skin and rank prefix | `hollowutils.disguise` (op) |
+| `/ping [player]` | Show latency in milliseconds | `hollowutils.ping` (everyone); `.ping.others` for another player (op) |
+| `/version` | Show the installed HollowUtils version | `hollowutils.version` (everyone) |
+
+### LuckPerms punishment weights
+
+Install LuckPerms to enable **player-issued punishment changes**. Console moderation and read-only history remain available without it. Staff must have a strictly greater highest inherited group weight than the target in the issuer's current LuckPerms world/server contexts. Operators do not bypass this rule. Example setup:
+
+```text
+lp group default setweight 0
+lp group moderator setweight 50
+lp group admin setweight 100
+```
+
+Weights do not grant command permissions by themselves. Assign the corresponding permissions from [PERMISSIONS.md](PERMISSIONS.md). All-zero or equal weights intentionally block peer punishment. Read-only history uses its command permissions without a rank comparison.
+
+The rule covers HollowUtils bans, IP bans, kicks, mutes and warnings, including offline UUIDs. Offline LuckPerms data loads asynchronously; permissions, current scope, affected identities and live weights are checked again before the ledger changes. IP bans check every known associated identity in the current scope, including offline players sharing that IP. An IP with no known identities requires console. Unbans, unmutes, warning removal and staff rollback additionally protect the original issuer's rank. Staff may reverse their own records, but only console can reverse console-issued records. Disguise rank appearance never changes these comparisons.
+
+These checks apply to **HollowUtils moderation commands**. Another plugin's explicitly namespaced moderation commands retain that plugin's permissions/hierarchy, including when manually typed. Configure those plugins consistently if staff have access to their moderation commands.
+
+### Other plugins' commands
+
+Unqualified commands from other plugins now appear and execute normally under those plugins' permission rules. Only namespaced root suggestions (`hollowutils:...`, `essentials:...`, `minecraft:...`) are hidden. Namespaced arguments such as `minecraft:diamond` or `minecraft:efficiency` are unaffected. Manually typing a namespaced command is still possible under its owner's permissions. HollowUtils continues to prioritize its own matching plain names and never bypasses its own permission gates. The legacy `allowed-commands` configuration is ignored.
+
+### Random teleport
+
+`/rtp` searches the logical server's **overworld**, even when invoked from its Nether/End. It clips the search area around overworld spawn to the current world border and selects dry, full solid ground with two air blocks overhead. Magma and water/lava landings are rejected. Candidate chunks load asynchronously; location checks and teleport run on the server thread after generation. Teleport protection events remain in effect. Failed/cancelled searches leave the player where they are.
+
+Defaults: minimum radius 128, maximum radius 5000, 16 candidate chunks, 30-second per-player/per-server cooldown, 30-second search timeout. Configure `rtp.min-radius`, `rtp.max-radius`, `rtp.max-attempts` (1–64) and `rtp.cooldown-seconds` (0–3600). Existing configs can add these keys; defaults apply when omitted. Requests cancel if player/world/scope or permissions change; one pending request per target is allowed. There is no forced platform generation or Nether/End RTP. Creating new terrain can still consume server resources despite asynchronous chunk loading.
+
+### Vanish and disguise GUI
+
+`hollowutils.vanish.see` (op) allows staff to see vanished players **inside the same logical server**. Cross-server visibility remains hidden. Vanish is session-only, persists across logical-server transfers while connected, and clears on logout/restart. Permission removal is checked within one second. A vanished player's normal local messages/announcements are limited to viewers who can see them. Global `/broadcast` remains intentionally global.
+
+The disguise GUI stages changes until **Apply**:
+
+1. **Name**: choose a visible online name or enter a Minecraft-style name in chat (3–16 letters, digits or underscores).
+2. **Skin**: choose a visible online player's current skin or enter a Minecraft account name. Remote lookup uses Paper's asynchronous profile API. Failed/timed-out lookups keep the previous appearance.
+3. **Rank**: choose a loaded LuckPerms group **for prefix appearance only**, or return to the real rank. No LuckPerms user/group/node/weight mutation is performed.
+4. Apply, remove the disguise, or close to discard edits. Typed GUI input is consumed privately, supports `cancel`, and expires after 60 seconds.
+
+The component permissions `hollowutils.disguise.name`, `.skin` and `.rank` all default to op. Grant them alongside `hollowutils.disguise` as appropriate. Disguise uses Paper's profile refresh for name/skin, preserves the real UUID, and updates display/tab text. Punishment records retain the real account name and UUID. Skins require Mojang's profile/skin services to be reachable (`api.mojang.com`, `sessionserver.mojang.com`, and their current service endpoints). No texture URL or credentials are accepted in chat.
+
+Disguises clear on logout/restart, logical-server change, `/disguise off`, or relevant permission removal. Dimension travel within a group keeps the disguise. Other plugins that cache names/skins or own their own tab lists may need compatibility testing. This is not an authentication identity change; permissions and punishment weights always use the actual account.
+
+### Chat format
+
+Local chat renders **`PREFIX - NAME: MESSAGE`**. The prefix comes from active LuckPerms metadata (legacy `&`/`§` colors supported); missing prefixes use `[Player]`. A disguise can override only the visible prefix/name. Prefix snapshots refresh on the server thread approximately once per second and are read safely by asynchronous chat. Message text is not parsed as MiniMessage or commands. Console auditing and existing group/vanish audiences remain respected; another chat plugin that replaces the renderer afterward can override the layout.
+
+Validation: **92 passing tests**, including strict rank order, shared-IP protection, live/offline rank lookups, hidden namespace suggestions, RTP radius/border bounds, cosmetic profile UUID preservation, prefix formatting, ping targeting, installed-version reporting and the full permission audit. Live LuckPerms + Paper moderation, skin rendering, GUI navigation, vanish packets, chat-plugin coexistence and random teleport generation still need multiplayer staging validation.
+
+Upgrade: stop Paper, remove the older **HollowUtils JAR only**, install `hollowutils-1.1.0.jar` alongside Multiverse-Core, Multiverse-Inventories and LuckPerms, then restart. Keep the `plugins/HollowUtils` data folder and other plugin configuration. Previous versioned downloads remain in the repository.

@@ -1,9 +1,16 @@
-# Additional commands must themselves enforce server-local player/data access.
-# All commands other than HollowUtils commands are blocked by default, even for ops.
-allowed-commands: []
+# Other plugins' commands use their normal permissions. Namespaced command roots
+# (such as hollowutils:spawn or essentials:home) are hidden from suggestions only.
+# The legacy allowed-commands setting, if present in an old config, is no longer used.
 
 # gdrive v3 must be installed and authenticated by the server operator.
 # No credential values belong here. /backup always keeps the local ZIP.
 gdrive:
   executable: gdrive
   parent-id: ''
+
+# Safe RTP around the logical server overworld spawn, clipped to its world border.
+rtp:
+  min-radius: 128
+  max-radius: 5000
+  max-attempts: 16
+  cooldown-seconds: 30

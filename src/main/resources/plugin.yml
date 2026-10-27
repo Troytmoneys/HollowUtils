@@ -1,9 +1,9 @@
 name: HollowUtils
-version: 1.0.0
+version: ${project.version}
 main: io.github.troytmoneys.hollowutils.HollowUtils
 api-version: '1.21.11'
 depend: [Multiverse-Core, Multiverse-Inventories]
-softdepend: [Essentials, CMI]
+softdepend: [Essentials, CMI, LuckPerms]
 description: Isolated logical survival servers with linked dimensions.
 commands:
   server:
@@ -286,6 +286,30 @@ commands:
     description: Toggle server-scoped damage protection
     usage: /god [on|off] [player]
     permission: hollowutils.god
+  instabreak:
+    description: Alias for the instant-breaking toggle
+    usage: /instabreak [on|off]
+    permission: hollowutils.togglebreakdelay
+  rtp:
+    description: Random teleport within your logical server
+    usage: /rtp [player]
+    permission: hollowutils.rtp
+  vanish:
+    description: Hide yourself from ordinary players
+    usage: /vanish [on|off]
+    permission: hollowutils.vanish
+  disguise:
+    description: Choose a cosmetic name, skin and rank prefix
+    usage: /disguise [off]
+    permission: hollowutils.disguise
+  ping:
+    description: Show your connection latency
+    usage: /ping [player]
+    permission: hollowutils.ping
+  version:
+    description: Show the HollowUtils plugin version
+    usage: /version
+    permission: hollowutils.version
 permissions:
   hollowutils.use:
     default: true
@@ -456,3 +480,25 @@ permissions:
     default: op
   hollowutils.god.others:
     default: op
+  hollowutils.rtp:
+    default: true
+  hollowutils.rtp.others:
+    default: op
+  hollowutils.vanish:
+    default: op
+  hollowutils.vanish.see:
+    default: op
+  hollowutils.disguise:
+    default: op
+  hollowutils.disguise.name:
+    default: op
+  hollowutils.disguise.skin:
+    default: op
+  hollowutils.disguise.rank:
+    default: op
+  hollowutils.ping:
+    default: true
+  hollowutils.ping.others:
+    default: op
+  hollowutils.version:
+    default: true

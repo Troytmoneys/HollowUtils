@@ -119,6 +119,12 @@ class UtilityCommandsTest {
         assertFalse(commands.execute(self.player, "heal", new String[]{"Self", "extra"}));
         assertFalse(self.values.containsKey("Health"));
     }
+    @Test void duplicateDisguiseNamesCannotCauseAnAccidentalTargetedAction() {
+        Account source=new Account("Staff"),one=new Account("Alias"),two=new Account("Alias");
+        source.permissions.addAll(List.of("hollowutils.heal","hollowutils.heal.others"));
+        assertThrows(IllegalArgumentException.class,()->utility(source,one,two).execute(source.player,"heal",new String[]{"Alias"}));
+        assertFalse(one.values.containsKey("Health"));assertFalse(two.values.containsKey("Health"));
+    }
     @Test void consoleMustSpecifyTargetAndCanActAcrossServers() {
         Account foreign = new Account("OtherServer");
         CommandSender console = (CommandSender) Proxy.newProxyInstance(CommandSender.class.getClassLoader(), new Class<?>[]{CommandSender.class},

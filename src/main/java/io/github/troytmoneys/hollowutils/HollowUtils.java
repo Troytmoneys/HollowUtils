@@ -46,6 +46,9 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
     private UtilityCommands utilities;
     private ItemCommands items;
     private GodMode god;
+    private RandomTeleport randomTeleport;
+    private StaffAppearance appearance;
+    private InfoCommands info;
     private EnvironmentCommands environment;
     private ExtraCommands extras;
     private Warps warps;
@@ -112,12 +115,15 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
             saveData();
             items = new ItemCommands(this,utilities);
             god = new GodMode(this,utilities);
+            randomTeleport = new RandomTeleport(this,utilities);
             environment = new EnvironmentCommands(this,utilities);
             warps = new Warps(this);
             homes = new Warps(this,true);
             messages = new SocialMessages(this);
             extras = new ExtraCommands(this, utilities);
             moderation = new Moderation(this);
+            appearance = new StaffAppearance(this);
+            info = new InfoCommands(utilities,()->getPluginMeta().getVersion());
             // Legacy death/spawn locations are migrated while old autoloaded worlds are still available.
             for (ServerGroup group : servers.values()) if (group.unloaded && !group.deleting) lifecycle.unload(group);
             ready = true;
@@ -129,7 +135,9 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
             for (Player player : Bukkit.getOnlinePlayers()) player.kick(Component.text("HollowUtils isolation setup failed. Contact an administrator."));
         }
     }
-    private static Set<String> allCommands() { Set<String> names = new HashSet<>(USER_COMMANDS); names.addAll(ADMIN_COMMANDS); names.addAll(UtilityCommands.COMMANDS); names.addAll(ExtraCommands.NAMES); names.addAll(Moderation.COMMANDS); names.addAll(Warps.COMMANDS); names.addAll(Warps.HOME_COMMANDS); names.addAll(SocialMessages.COMMANDS); names.addAll(EnvironmentCommands.COMMANDS); names.addAll(ServerLifecycle.COMMANDS); names.addAll(ItemCommands.COMMANDS); names.addAll(GodMode.COMMANDS); return names; }
+    private static Set<String> allCommands() { Set<String> names = new HashSet<>(USER_COMMANDS); names.addAll(ADMIN_COMMANDS); names.addAll(UtilityCommands.COMMANDS); names.addAll(ExtraCommands.NAMES); names.addAll(Moderation.COMMANDS); names.addAll(Warps.COMMANDS); names.addAll(Warps.HOME_COMMANDS); names.addAll(SocialMessages.COMMANDS); names.addAll(EnvironmentCommands.COMMANDS); names.addAll(ServerLifecycle.COMMANDS); names.addAll(ItemCommands.COMMANDS); names.addAll(GodMode.COMMANDS); names.addAll(RandomTeleport.COMMANDS); names.addAll(StaffAppearance.COMMANDS); names.addAll(InfoCommands.COMMANDS); return names; }
+    void refreshPlayerVisibility() { if(ready)refreshVisibility(); }
+    String realName(Player player) { return appearance==null?player.getName():appearance.realName(player); }
     boolean isMuted(Player player) { return moderation != null && moderation.muted(player); }
     List<World> serverWorlds(String id) {
         ServerGroup server=requireServer(id);
@@ -203,6 +211,9 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
         if (!ready) { Responses.error(sender, "Isolation is locked. Check the server console."); return true; }
         if (!sender.hasPermission(CommandPermissions.node(name))) { Responses.error(sender, "You do not have permission."); return true; }
         try {
+            if (InfoCommands.COMMANDS.contains(name)) return info.execute(sender,name,args);
+            if (StaffAppearance.COMMANDS.contains(name)) return appearance.execute(sender,name,args);
+            if (RandomTeleport.COMMANDS.contains(name)) return randomTeleport.execute(sender,args);
             if (GodMode.COMMANDS.contains(name)) return god.execute(sender,args);
             if (ItemCommands.COMMANDS.contains(name)) return items.execute(sender,name,args);
             if (ServerLifecycle.COMMANDS.contains(name)) {
@@ -421,7 +432,7 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
         String normalized = label.toLowerCase(Locale.ROOT);
         if (normalized.startsWith("hollowutils:")) normalized = normalized.substring("hollowutils:".length());
         if(allCommands().contains(normalized))return player.hasPermission(CommandPermissions.node(normalized));
-        return getConfig().getStringList("allowed-commands").contains(normalized);
+        return true; // Other plugins enforce their own permissions and command policies.
     }
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true) public void command(PlayerCommandPreprocessEvent event) {
         String label = event.getMessage().substring(1).split(" ", 2)[0];
@@ -447,30 +458,41 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
         catch (ReflectiveOperationException e) { getLogger().log(Level.WARNING, "Command map updated, but command-tree refresh failed", e); }
         if (ready) refreshVisibility();
     }
-    @EventHandler public void commands(PlayerCommandSendEvent event) {
-        event.getCommands().removeIf(label -> !commandAllowed(event.getPlayer(), label));
+    @EventHandler(priority=EventPriority.HIGHEST) public void commands(PlayerCommandSendEvent event) {
+        event.getCommands().removeIf(label -> !CommandVisibility.visible(label,allCommands()::contains,
+                root->event.getPlayer().hasPermission(CommandPermissions.node(root))));
+        allowedRoots.put(event.getPlayer().getUniqueId(),event.getCommands().stream().map(CommandVisibility::label).collect(java.util.stream.Collectors.toUnmodifiableSet()));
     }
     private static String completionRoot(String buffer) {
-        return buffer.replaceFirst("^/", "").split(" ", 2)[0].toLowerCase(Locale.ROOT);
+        return CommandVisibility.root(buffer);
     }
     @EventHandler(priority = EventPriority.HIGHEST) public void asyncCompletion(AsyncTabCompleteEvent event) {
         if (event.getSender() instanceof Player player) {
-            String root = completionRoot(event.getBuffer());
-            if (!event.isCommand() || !allowedRoots.getOrDefault(player.getUniqueId(), Set.of()).contains(root)) {
+            if(!event.isCommand())return;
+            Set<String> roots=allowedRoots.getOrDefault(player.getUniqueId(),Set.of());
+            if(!CommandVisibility.completionAllowed(event.getBuffer(),roots)) {
                 event.getCompletions().clear(); event.setHandled(true); event.setCancelled(true);
+            } else if(CommandVisibility.rootCompletion(event.getBuffer())) {
+                event.getCompletions().removeIf(value->!roots.contains(CommandVisibility.label(value)));
             }
         }
     }
     @EventHandler(priority = EventPriority.HIGHEST) public void completion(TabCompleteEvent event) {
-        if (event.getSender() instanceof Player player && !commandAllowed(player, completionRoot(event.getBuffer()))) {
-            event.setCompletions(List.of()); event.setCancelled(true);
+        if(event.getSender() instanceof Player player) {
+            String root=completionRoot(event.getBuffer());
+            if(root.contains(":")||!commandAllowed(player,root)) { event.setCompletions(List.of());event.setCancelled(true); }
+            else if(CommandVisibility.rootCompletion(event.getBuffer())) event.getCompletions().removeIf(label->
+                    !CommandVisibility.visible(label,allCommands()::contains,key->player.hasPermission(CommandPermissions.node(key))));
         }
     }
     @Override public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-        if (!ready || args.length == 0) return List.of();
+        if (!ready || args.length == 0 || !sender.hasPermission(CommandPermissions.node(command.getName()))) return List.of();
         List<String> choices = new ArrayList<>();
         String name = command.getName();
-        if (GodMode.COMMANDS.contains(name)) choices.addAll(god.complete(sender,args));
+        if (InfoCommands.COMMANDS.contains(name)) choices.addAll(info.complete(sender,name,args));
+        else if (StaffAppearance.COMMANDS.contains(name)) choices.addAll(appearance.complete(sender,name,args));
+        else if (RandomTeleport.COMMANDS.contains(name)) choices.addAll(randomTeleport.complete(sender,args));
+        else if (GodMode.COMMANDS.contains(name)) choices.addAll(god.complete(sender,args));
         else if (ItemCommands.COMMANDS.contains(name)) choices.addAll(items.complete(sender,name,args));
         else if (ServerLifecycle.COMMANDS.contains(name)) {
             if(args.length==1 && sender.hasPermission("hollowutils."+name)) servers.values().stream().filter(s->!s.id.equals("lobby")).map(s->s.id).forEach(choices::add);
@@ -502,15 +524,19 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
         for (Player viewer : Bukkit.getOnlinePlayers()) {
             Set<UUID> peers = new HashSet<>();
             for (Player target : Bukkit.getOnlinePlayers()) {
-                if (Objects.equals(memberships.get(viewer.getUniqueId()), memberships.get(target.getUniqueId()))) {
-                    viewer.showPlayer(this, target); peers.add(target.getUniqueId());
-                } else viewer.hidePlayer(this, target);
+                boolean same=Objects.equals(memberships.get(viewer.getUniqueId()),memberships.get(target.getUniqueId()));
+                boolean visible=appearance==null||appearance.visible(viewer,target);
+                if(same&&visible) {
+                    viewer.showPlayer(this,target);
+                    if((appearance==null||appearance.visible(target,viewer))&&viewer.canSee(target))peers.add(target.getUniqueId());
+                } else viewer.hidePlayer(this,target);
             }
             chatPeers.put(viewer.getUniqueId(), Set.copyOf(peers));
-            Set<String> roots = new HashSet<>(getConfig().getStringList("allowed-commands"));
-            for (String label : allCommands()) if (commandAllowed(viewer, label)) {
-                roots.add(label); roots.add("hollowutils:" + label);
-            }
+            Set<String> roots = new HashSet<>();
+            getServer().getCommandMap().getKnownCommands().forEach((label,command)-> {
+                if(CommandVisibility.visible(label,allCommands()::contains,root->viewer.hasPermission(CommandPermissions.node(root)))
+                        && command.testPermissionSilent(viewer))roots.add(CommandVisibility.label(label));
+            });
             allowedRoots.put(viewer.getUniqueId(), Set.copyOf(roots));
             viewer.updateCommands();
         }
@@ -518,7 +544,9 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true) public void chat(AsyncChatEvent event) {
         Set<UUID> allowed = chatPeers.getOrDefault(event.getPlayer().getUniqueId(), Set.of());
         event.viewers().removeIf(a -> a instanceof Player p && !allowed.contains(p.getUniqueId()));
-        // Keep the console as an audit recipient. Do not re-add anyone hidden by another chat plugin.
+        ChatFormat.Identity identity=appearance==null?ChatFormat.identity(null,event.getPlayer().getName()):appearance.identity(event.getPlayer());
+        event.renderer((source,displayName,message,viewer)->ChatFormat.render(identity,message));
+        // Keep console auditing; never re-add recipients another chat plugin has removed.
     }
     @EventHandler(priority = EventPriority.HIGHEST) public void login(PlayerLoginEvent event) {
         if (!ready) event.disallow(PlayerLoginEvent.Result.KICK_OTHER, "HollowUtils isolation setup failed. Contact an administrator.");
@@ -543,12 +571,12 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
     }
     private void local(Player source, String message) {
         String id = memberships.get(source.getUniqueId());
-        for (Player target : Bukkit.getOnlinePlayers()) if (Objects.equals(id, memberships.get(target.getUniqueId()))) target.sendMessage(Component.text(message));
+        for (Player target : Bukkit.getOnlinePlayers()) if (Objects.equals(id, memberships.get(target.getUniqueId()))&&target.canSee(source)) target.sendMessage(Component.text(message));
     }
     @EventHandler(priority = EventPriority.HIGHEST) public void advancement(PlayerAdvancementDoneEvent event) {
         Component message = event.message(); event.message(null);
         if (message != null) for (Player player : Bukkit.getOnlinePlayers())
-            if (group(player) == group(event.getPlayer())) player.sendMessage(message);
+            if (group(player) == group(event.getPlayer())&&player.canSee(event.getPlayer())) player.sendMessage(message);
     }
     // Entity portal travel has no player access checks; block it to prevent item/mob leakage.
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true) public void entityPortal(EntityPortalEvent event) {
@@ -556,7 +584,7 @@ public final class HollowUtils extends JavaPlugin implements Listener, CommandEx
     }
     @EventHandler(priority = EventPriority.HIGHEST) public void died(PlayerDeathEvent event) {
         Component message = event.deathMessage(); event.deathMessage(null);
-        if (message != null) for (Player player : Bukkit.getOnlinePlayers()) if (group(player) == group(event.getEntity())) player.sendMessage(message);
+        if (message != null) for (Player player : Bukkit.getOnlinePlayers()) if (group(player) == group(event.getEntity())&&player.canSee(event.getEntity())) player.sendMessage(message);
     }
     @EventHandler(priority = EventPriority.MONITOR) public void changed(PlayerChangedWorldEvent event) {
         remember(event.getPlayer()); refreshVisibility();

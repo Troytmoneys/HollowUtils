@@ -7,6 +7,7 @@ final class CommandPermissions {
         String canonical=switch(command) {
             case "gmc","gms","gmsp","gma","gm" -> "gamemode";
             case "bc" -> "broadcast";
+            case "instabreak" -> "togglebreakdelay";
             case "ci","clearinventory" -> "clear";
             case "pm","message","whisper","privatemanager" -> "msg";
             default -> command;

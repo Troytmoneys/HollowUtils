@@ -9,7 +9,7 @@ import org.bukkit.inventory.meta.EnchantmentStorageMeta;
 import java.util.*;
 
 final class ItemCommands {
-    static final Set<String> COMMANDS=Set.of("togglebreakdelay","i","give","enchant");
+    static final Set<String> COMMANDS=Set.of("togglebreakdelay","instabreak","i","give","enchant");
     private final UtilityCommands targets;
     private final InstantBreaking breaking;
     ItemCommands(HollowUtils plugin,UtilityCommands targets) {
@@ -17,8 +17,8 @@ final class ItemCommands {
         plugin.getServer().getPluginManager().registerEvents(breaking,plugin);
     }
     boolean execute(CommandSender sender,String name,String[] args) {
-        UtilityCommands.requirePermission(sender,"hollowutils."+name);
-        if(name.equals("togglebreakdelay"))return breaking.execute(sender,args);
+        UtilityCommands.requirePermission(sender,CommandPermissions.node(name));
+        if(name.equals("togglebreakdelay")||name.equals("instabreak"))return breaking.execute(sender,args);
         if(name.equals("enchant"))return enchant(sender,args);
         boolean give=name.equals("give");int index=give?1:0;
         if(args.length<index+1||args.length>index+2)return false;
@@ -68,8 +68,8 @@ final class ItemCommands {
         return true;
     }
     List<String> complete(CommandSender sender,String name,String[] args) {
-        if(!sender.hasPermission("hollowutils."+name))return List.of();
-        if(name.equals("togglebreakdelay"))return args.length==1?List.of("on","off"):List.of();
+        if(!sender.hasPermission(CommandPermissions.node(name)))return List.of();
+        if(name.equals("togglebreakdelay")||name.equals("instabreak"))return args.length==1?List.of("on","off"):List.of();
         if(name.equals("give")&&args.length==1)return targets.targetNames(sender,"hollowutils.give.others");
         if((name.equals("i")&&args.length==1)||(name.equals("give")&&args.length==2))return Arrays.stream(Material.values()).filter(m->m.isItem()&&!m.isAir()).map(m->m.getKey().getKey()).sorted().toList();
         if((name.equals("i")&&args.length==2)||(name.equals("give")&&args.length==3))return List.of("1","16","64");

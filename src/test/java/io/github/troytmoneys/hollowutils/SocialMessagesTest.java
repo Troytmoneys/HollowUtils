@@ -58,6 +58,12 @@ class SocialMessagesTest {
         for(String name:List.of("Hidden","Foreign")) assertEquals(missing,assertThrows(IllegalArgumentException.class,()->service.execute(a.player,"pm",new String[]{name,"hi"})).getMessage());
         assertTrue(hidden.inbox.isEmpty());assertTrue(foreign.inbox.isEmpty());
     }
+    @Test void duplicateDisguiseNamesDoNotDeliverPrivateContentToTheWrongAccount() {
+        var source=new Account("Alice");var one=new Account("Alias");var two=new Account("Alias");
+        var messages=service(source,one,two);
+        assertThrows(IllegalArgumentException.class,()->messages.execute(source.player,"msg",new String[]{"Alias","private"}));
+        assertTrue(one.inbox.isEmpty());assertTrue(two.inbox.isEmpty());
+    }
     @Test void spyPermissionIsRecheckedAndReconnectClearsSubscription() {
         var a=new Account("Alice");var b=new Account("Bob");var spy=new Account("Staff");spy.permissions.add("hollowutils.socialspy");
         var service=service(a,b,spy);service.execute(spy.player,"socialspy",new String[]{"on"});spy.inbox.clear();

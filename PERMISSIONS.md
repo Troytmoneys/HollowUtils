@@ -1,6 +1,6 @@
 # Command permissions
 
-Every registered HollowUtils command is checked at command registration, execution and completion. Aliases share their canonical command permission. Default `true` means everyone; `op` means operators. Give additional `.others` permissions only when staff should target other players.
+Every registered HollowUtils command is checked at registration, execution and completion. Aliases share their canonical permission. Default `true` means everyone; `op` means operators. Give additional `.others` permissions only when staff should target other players.
 
 | Command | Required permission | Default |
 | --- | --- | --- |
@@ -24,6 +24,7 @@ Every registered HollowUtils command is checked at command registration, executi
 | `/deletekit` | `hollowutils.deletekit` | `op` |
 | `/deleteserver` | `hollowutils.deleteserver` | `op` |
 | `/deletewarp` | `hollowutils.deletewarp` | `op` |
+| `/disguise` | `hollowutils.disguise` | `op` |
 | `/enchant` | `hollowutils.enchant` | `op` |
 | `/fly` | `hollowutils.fly` | `op` |
 | `/flyspeed` | `hollowutils.flyspeed` | `op` |
@@ -40,6 +41,7 @@ Every registered HollowUtils command is checked at command registration, executi
 | `/home` | `hollowutils.home` | `true` |
 | `/homegui` | `hollowutils.homegui` | `true` |
 | `/i` | `hollowutils.i` | `op` |
+| `/instabreak` | `hollowutils.togglebreakdelay` | `op` |
 | `/kick` | `hollowutils.kick` | `op` |
 | `/kit` | `hollowutils.kit` | `op` |
 | `/loadserver` | `hollowutils.loadserver` | `op` |
@@ -48,10 +50,12 @@ Every registered HollowUtils command is checked at command registration, executi
 | `/msg` | `hollowutils.msg` | `true` |
 | `/mute` | `hollowutils.mute` | `op` |
 | `/night` | `hollowutils.night` | `op` |
+| `/ping` | `hollowutils.ping` | `true` |
 | `/pm` | `hollowutils.msg` | `true` |
 | `/privatemanager` | `hollowutils.msg` | `true` |
 | `/punishments` | `hollowutils.punishments` | `op` |
 | `/rain` | `hollowutils.rain` | `op` |
+| `/rtp` | `hollowutils.rtp` | `true` |
 | `/server` | `hollowutils.server` | `true` |
 | `/setspawn` | `hollowutils.setspawn` | `op` |
 | `/socialspy` | `hollowutils.socialspy` | `op` |
@@ -67,6 +71,8 @@ Every registered HollowUtils command is checked at command registration, executi
 | `/unloadserver` | `hollowutils.unloadserver` | `op` |
 | `/unmute` | `hollowutils.unmute` | `op` |
 | `/unwarn` | `hollowutils.unwarn` | `op` |
+| `/vanish` | `hollowutils.vanish` | `op` |
+| `/version` | `hollowutils.version` | `true` |
 | `/walkspeed` | `hollowutils.walkspeed` | `op` |
 | `/warn` | `hollowutils.warn` | `op` |
 | `/warns` | `hollowutils.warns` | `op` |
@@ -83,6 +89,9 @@ Additional and legacy permissions:
 | `hollowutils.bottom.others` | `op` |
 | `hollowutils.bypass` | `op` |
 | `hollowutils.clear.others` | `op` |
+| `hollowutils.disguise.name` | `op` |
+| `hollowutils.disguise.rank` | `op` |
+| `hollowutils.disguise.skin` | `op` |
 | `hollowutils.enchant.unsafe` | `op` |
 | `hollowutils.fly.others` | `op` |
 | `hollowutils.flyspeed.others` | `op` |
@@ -95,14 +104,21 @@ Additional and legacy permissions:
 | `hollowutils.god.others` | `op` |
 | `hollowutils.heal.others` | `op` |
 | `hollowutils.kit.others` | `op` |
+| `hollowutils.ping.others` | `op` |
+| `hollowutils.rtp.others` | `op` |
 | `hollowutils.server.others` | `op` |
 | `hollowutils.setspawn.others` | `op` |
 | `hollowutils.spawn.others` | `op` |
 | `hollowutils.use` | `true` |
+| `hollowutils.vanish.see` | `op` |
 | `hollowutils.walkspeed.others` | `op` |
 
-`hollowutils.use` remains a parent for `hollowutils.server` and `hollowutils.spawn`. `hollowutils.admin` remains a parent for the original core administrative commands: createserver, backupserver, whitelistserver, deleteserver, maintenanceserver and setspawn. Other command families use the explicit permissions above. The runtime gate cannot be bypassed by adding a HollowUtils command to `allowed-commands`.
+`hollowutils.use` remains a parent for `hollowutils.server` and `hollowutils.spawn`. `hollowutils.admin` remains a parent for the original core administrative commands: createserver, backupserver, whitelistserver, deleteserver, maintenanceserver and setspawn. Other command families use the explicit nodes above. Other plugins’ commands use their own permissions; hiding namespaced suggestions does not remove those commands.
 
-`hollowutils.enchant.unsafe` is required for enchantments above their normal maximum or for incompatible/conflicting enchantments; it cannot bypass Minecraft’s native level 255 storage limit. `hollowutils.bypass` bypasses whitelist and maintenance, not bans or unloaded/deleting groups. God mode granted to someone else does not require them to hold the command permission; staff can turn it off and it clears on logout or logical-server change.
+Punishment permissions also require LuckPerms hierarchy checks for player senders: highest applicable inherited group weight must exceed the target. Operator status and cosmetic rank disguises do not bypass this. Reversals protect the original issuer; own records may be revoked and console-issued records require console. There is no player hierarchy bypass node.
 
-Legacy grants to `hollowutils.admin`/`hollowutils.use` remain supported. Granting a single core command no longer requires granting the entire legacy admin group.
+`hollowutils.vanish.see` reveals vanished staff only within the same logical server. `hollowutils.disguise.name`, `.skin` and `.rank` govern the corresponding GUI choices and default to operators. Cosmetic rank selection does not grant any real permissions or weight.
+
+`hollowutils.enchant.unsafe` permits above-normal or incompatible/conflicting enchants, but cannot bypass Minecraft’s native level 255 limit. `hollowutils.bypass` bypasses whitelist/maintenance, not bans or unloaded/deleting groups. God mode granted to another player does not require them to hold the command permission and clears on logout or group change.
+
+The legacy allowed-commands setting is no longer used. Namespace roots are hidden from suggestions; third-party commands retain their normal permissions and behavior.

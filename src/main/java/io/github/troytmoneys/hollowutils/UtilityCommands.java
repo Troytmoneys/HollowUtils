@@ -55,9 +55,11 @@ final class UtilityCommands {
             throw new IllegalArgumentException("Console must specify a player.");
         }
         // No selectors, UUID lookup, partial matches or global existence information.
-        Player target = players.get().stream().filter(p -> p.getName().equalsIgnoreCase(name))
-                .filter(p -> !(sender instanceof Player source) || (sameServer.test(source, p) && source.canSee(p)))
-                .findFirst().orElseThrow(() -> new IllegalArgumentException("Player not found in your server."));
+        var matches = players.get().stream().filter(p -> p.getName().equalsIgnoreCase(name))
+                .filter(p -> !(sender instanceof Player source) || (sameServer.test(source, p) && source.canSee(p))).toList();
+        if(matches.isEmpty())throw new IllegalArgumentException("Player not found in your server.");
+        if(matches.size()!=1)throw new IllegalArgumentException("Multiple visible players use that name. Remove a conflicting disguise before targeting that name.");
+        Player target=matches.getFirst();
         if (!(sender instanceof Player source) || !source.getUniqueId().equals(target.getUniqueId())) requirePermission(sender, othersPermission);
         return target;
     }

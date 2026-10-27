@@ -49,8 +49,10 @@ final class SocialMessages implements Listener {
         }
         if(args.length<2) return false;
         if(muted.test(source)) throw new IllegalArgumentException("You are muted in this server and cannot send private messages.");
-        Player target=recipients(source).stream().filter(p -> p.getName().equalsIgnoreCase(args[0])).findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Player not found in your server."));
+        var matches=recipients(source).stream().filter(p->p.getName().equalsIgnoreCase(args[0])).toList();
+        if(matches.isEmpty())throw new IllegalArgumentException("Player not found in your server.");
+        if(matches.size()!=1)throw new IllegalArgumentException("Multiple visible players use that name. Private message was not sent.");
+        Player target=matches.getFirst();
         String text=String.join(" ",Arrays.copyOfRange(args,1,args.length));
         if(text.isBlank()||text.length()>500) throw new IllegalArgumentException("Messages must be 1–500 characters.");
         Responses.info(target,"✉ "+source.getName()+" → you",text);
